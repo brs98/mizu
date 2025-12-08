@@ -5,10 +5,7 @@
  * Replaces the Python security.py with the SDK's canUseTool callback pattern.
  */
 
-export type PermissionDecision =
-  | { behavior: "allow" }
-  | { behavior: "deny"; message: string }
-  | { behavior: "ask"; message: string };
+import type { PermissionResult, CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 
 export type AgentType = "bugfix" | "feature" | "refactor" | "greenfield";
 
@@ -94,7 +91,11 @@ function extractCommands(command: string): string[] {
   return commands;
 }
 
-function validateKillCommand(command: string): PermissionDecision {
+type InternalDecision =
+  | { behavior: "allow" }
+  | { behavior: "deny"; message: string };
+
+function validateKillCommand(command: string): InternalDecision {
   const parts = command.split(/\s+/);
   const args = parts.slice(1).filter(p => !p.startsWith("-"));
 
@@ -122,32 +123,33 @@ function validateKillCommand(command: string): PermissionDecision {
 /**
  * Create a permission callback for the SDK's canUseTool option
  */
-export function createPermissionCallback(agentType: AgentType) {
+export function createPermissionCallback(agentType: AgentType): CanUseTool {
   const allowedCommands = getAllowedCommands(agentType);
 
   return async (
     toolName: string,
     input: Record<string, unknown>
-  ): Promise<PermissionDecision> => {
+  ): Promise<PermissionResult> => {
+    // Helper to create allow result
+    const allow = (): PermissionResult => ({ behavior: "allow", updatedInput: input });
+    const deny = (message: string): PermissionResult => ({ behavior: "deny", message });
+
     // Always allow read-only tools
     if (["Read", "Grep", "Glob"].includes(toolName)) {
-      return { behavior: "allow" };
+      return allow();
     }
 
     // Validate Bash commands
     if (toolName === "Bash") {
       const command = input.command as string;
       if (!command) {
-        return { behavior: "allow" };
+        return allow();
       }
 
       // Check for dangerous patterns
       for (const pattern of DANGEROUS_PATTERNS) {
         if (pattern.test(command)) {
-          return {
-            behavior: "deny",
-            message: `Dangerous command pattern blocked: ${pattern}`,
-          };
+          return deny(`Dangerous command pattern blocked: ${pattern}`);
         }
       }
 
@@ -158,7 +160,7 @@ export function createPermissionCallback(agentType: AgentType) {
         // Special handling for rm
         if (cmd === "rm") {
           if (command.includes("-rf") || command.includes("-fr")) {
-            return { behavior: "deny", message: "rm -rf not allowed for safety" };
+            return deny("rm -rf not allowed for safety");
           }
           continue;
         }
@@ -167,22 +169,19 @@ export function createPermissionCallback(agentType: AgentType) {
         if (cmd === "pkill" || cmd === "kill") {
           const result = validateKillCommand(command);
           if (result.behavior !== "allow") {
-            return result;
+            return deny(result.message);
           }
           continue;
         }
 
         // Check allowlist
         if (!allowedCommands.has(cmd)) {
-          return {
-            behavior: "deny",
-            message: `Command '${cmd}' is not in the allowed commands list for ${agentType} agent`,
-          };
+          return deny(`Command '${cmd}' is not in the allowed commands list for ${agentType} agent`);
         }
       }
     }
 
-    return { behavior: "allow" };
+    return allow();
   };
 }
 

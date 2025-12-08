@@ -10,7 +10,6 @@
  * 4. Completes quickly for simple bugs
  */
 
-import { query } from "@anthropic-ai/claude-agent-sdk";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,11 +19,12 @@ import {
   getDepthConfig,
   getDepthPromptContext,
 } from "../../core/depth";
-import {
-  createPermissionCallback,
-  getPermissionMode,
-} from "../../core/permissions";
 import { loadAndRenderPrompt } from "../../core/prompts";
+import {
+  runMultiSessionAgent,
+  printAgentHeader,
+  printCompletionSummary,
+} from "../../core/session";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPTS_DIR = resolve(__dirname, "prompts");
@@ -35,12 +35,15 @@ export interface BugFixOptions {
   errorFile?: string;
   depth: DepthLevel;
   model?: string;
+  maxIterations?: number;
 }
 
 const SYSTEM_PROMPT = `You are an expert debugger focused on finding and fixing bugs efficiently.
 You make minimal, targeted changes to fix issues without unnecessary refactoring.
 You understand that the user's time is valuable and aim to fix bugs quickly.
-You always verify your fixes work before declaring completion.`;
+You always verify your fixes work before declaring completion.
+
+When the fix is verified and working, you MUST say "Fix verified - bug is resolved" to indicate completion.`;
 
 /**
  * Get the appropriate prompt based on depth level
@@ -58,7 +61,7 @@ function getBugFixPrompt(errorInput: string, depth: DepthLevel): string {
     return loadAndRenderPrompt(promptFile, context);
   }
 
-  // Fallback to inline prompts
+  // Fallback to inline prompt
   return getFallbackPrompt(errorInput, depth);
 }
 
@@ -125,6 +128,29 @@ When the fix is verified, say "Fix verified - bug is resolved" to indicate compl
 }
 
 /**
+ * Continuation prompt for subsequent sessions
+ */
+function getContinuationPrompt(errorInput: string, depth: DepthLevel): string {
+  return `# Continue Bug Fix
+
+You are continuing work on fixing a bug. This is a fresh context window.
+
+## Original Error
+\`\`\`
+${errorInput}
+\`\`\`
+
+## Instructions
+
+1. Check the current state of the codebase
+2. Review any changes already made
+3. Continue diagnosing and fixing the bug
+4. Verify the fix works
+
+When the fix is verified, say "Fix verified - bug is resolved" to indicate completion.`;
+}
+
+/**
  * Run the bug fix agent
  */
 export async function runBugFix(options: BugFixOptions): Promise<void> {
@@ -134,6 +160,7 @@ export async function runBugFix(options: BugFixOptions): Promise<void> {
     errorFile,
     depth,
     model = "claude-sonnet-4-5",
+    maxIterations,
   } = options;
 
   // Load error input
@@ -146,100 +173,53 @@ export async function runBugFix(options: BugFixOptions): Promise<void> {
     console.error("Warning: No error input provided. Agent will look for obvious issues.");
   }
 
-  const config = getDepthConfig(depth);
+  const depthConfig = getDepthConfig(depth);
+  const resolvedProjectDir = resolve(projectDir);
 
-  console.log("\n" + "=".repeat(70));
-  console.log("  BUG FIX AGENT");
-  console.log("=".repeat(70));
-  console.log(`\nProject: ${resolve(projectDir)}`);
-  console.log(`Model: ${model}`);
-  console.log(`Depth: ${depth}`);
-  console.log(`Budget: $${config.maxBudgetUsd.toFixed(2)}`);
+  // Print header
+  printAgentHeader("Bug Fix Agent", resolvedProjectDir, model, depthConfig, maxIterations);
 
   if (error) {
     const preview = error.length > 200 ? error.slice(0, 200) + "..." : error;
-    console.log(`\nError input (${error.length} chars):`);
-    console.log(`  ${preview}`);
+    console.log(`Error input (${error.length} chars):`);
+    console.log(`  ${preview}\n`);
   }
-  console.log();
 
-  const prompt = getBugFixPrompt(error, depth);
+  // Completion markers for bug fix
+  const isComplete = (response: string): boolean => {
+    const lower = response.toLowerCase();
+    return (
+      lower.includes("fix verified") ||
+      lower.includes("bug fixed") ||
+      lower.includes("bug is resolved") ||
+      lower.includes("successfully fixed")
+    );
+  };
 
-  try {
-    const response = query({
-      prompt,
-      options: {
-        model,
-        workingDirectory: resolve(projectDir),
-        systemPrompt: SYSTEM_PROMPT,
-        maxBudgetUsd: config.maxBudgetUsd,
-        permissionMode: getPermissionMode(depth),
-        canUseTool: createPermissionCallback("bugfix"),
+  // Run multi-session agent
+  const result = await runMultiSessionAgent(
+    {
+      projectDir: resolvedProjectDir,
+      model,
+      depthConfig,
+      agentType: "bugfix",
+      systemPrompt: SYSTEM_PROMPT,
+      maxIterations,
+    },
+    {
+      getPrompt: (iteration) => {
+        if (iteration === 1) {
+          return getBugFixPrompt(error, depth);
+        }
+        return getContinuationPrompt(error, depth);
       },
-    });
-
-    let sessionId: string | undefined;
-    let isComplete = false;
-
-    for await (const message of response) {
-      switch (message.type) {
-        case "system":
-          if (message.subtype === "init") {
-            sessionId = message.session_id;
-            console.log(`Session: ${sessionId}\n`);
-            console.log("-".repeat(70) + "\n");
-          }
-          break;
-
-        case "assistant":
-          if (typeof message.content === "string") {
-            process.stdout.write(message.content);
-
-            // Check for completion markers
-            const lowerContent = message.content.toLowerCase();
-            if (
-              lowerContent.includes("fix verified") ||
-              lowerContent.includes("bug fixed") ||
-              lowerContent.includes("bug is resolved") ||
-              lowerContent.includes("successfully fixed")
-            ) {
-              isComplete = true;
-            }
-          }
-          break;
-
-        case "tool_call":
-          console.log(`\n[Tool: ${message.tool_name}]`);
-          break;
-
-        case "tool_result":
-          console.log(`[Done]`);
-          break;
-
-        case "error":
-          console.error(`\n[Error: ${message.error}]`);
-          break;
-      }
+      isComplete,
+      onComplete: () => {
+        console.log("Bug fix verified!");
+      },
     }
+  );
 
-    console.log("\n\n" + "=".repeat(70));
-    if (isComplete) {
-      console.log("  FIX COMPLETED");
-    } else {
-      console.log("  SESSION ENDED");
-      if (depth === "quick") {
-        console.log("\n  Tip: Use --depth standard for more thorough analysis");
-      }
-    }
-    console.log("=".repeat(70) + "\n");
-
-  } catch (err) {
-    const error = err as Error;
-    if (error.message?.includes("budget")) {
-      console.error(`\nBudget limit reached ($${config.maxBudgetUsd})`);
-      console.log("Consider using --depth thorough for more budget");
-    } else {
-      throw error;
-    }
-  }
+  // Print summary
+  printCompletionSummary("Bug Fix Agent", result.completed, result.iterations);
 }

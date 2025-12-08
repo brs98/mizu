@@ -12,44 +12,48 @@ export type VerificationLevel = "basic" | "standard" | "extensive";
 
 export interface DepthConfig {
   level: DepthLevel;
-  maxBudgetUsd: number;
+  maxIterations: number;
   analysisScope: AnalysisScope;
   verificationLevel: VerificationLevel;
   explorationBudget: number; // Max files to read during analysis
   requireFullTestPass: boolean;
+  autoContinueDelayMs: number; // Delay between sessions
 }
 
 /**
  * Depth presets control agent behavior:
  *
- * - quick: Minimal analysis, trust user's diagnosis, fast execution
- * - standard: Balanced exploration and implementation
- * - thorough: Comprehensive analysis, extensive testing
+ * - quick: Minimal analysis, trust user's diagnosis, fast execution (5 iterations)
+ * - standard: Balanced exploration and implementation (20 iterations)
+ * - thorough: Comprehensive analysis, extensive testing (unlimited iterations)
  */
 export const DEPTH_PRESETS: Record<DepthLevel, DepthConfig> = {
   quick: {
     level: "quick",
-    maxBudgetUsd: 0.5,
+    maxIterations: 5,
     analysisScope: "targeted",
     verificationLevel: "basic",
     explorationBudget: 10,
     requireFullTestPass: false,
+    autoContinueDelayMs: 1000,
   },
   standard: {
     level: "standard",
-    maxBudgetUsd: 2.0,
+    maxIterations: 20,
     analysisScope: "moderate",
     verificationLevel: "standard",
     explorationBudget: 30,
     requireFullTestPass: true,
+    autoContinueDelayMs: 2000,
   },
   thorough: {
     level: "thorough",
-    maxBudgetUsd: 10.0,
+    maxIterations: Infinity, // Run until complete
     analysisScope: "comprehensive",
     verificationLevel: "extensive",
     explorationBudget: 100,
     requireFullTestPass: true,
+    autoContinueDelayMs: 3000,
   },
 };
 

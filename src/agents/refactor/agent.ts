@@ -10,7 +10,6 @@
  * 4. Preserves all existing behavior
  */
 
-import { query } from "@anthropic-ai/claude-agent-sdk";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 
@@ -19,11 +18,12 @@ import {
   getDepthConfig,
   getDepthPromptContext,
 } from "../../core/depth";
-import {
-  createPermissionCallback,
-  getPermissionMode,
-} from "../../core/permissions";
 import { loadAndRenderPrompt } from "../../core/prompts";
+import {
+  runMultiSessionAgent,
+  printAgentHeader,
+  printCompletionSummary,
+} from "../../core/session";
 
 const PROMPTS_DIR = resolve(dirname(import.meta.path), "prompts");
 
@@ -33,13 +33,16 @@ export interface RefactorOptions {
   focus?: "performance" | "readability" | "patterns" | "all";
   depth: DepthLevel;
   model?: string;
+  maxIterations?: number;
 }
 
 const SYSTEM_PROMPT = `You are an expert software architect focused on improving code quality.
 You make safe, incremental refactoring changes.
 You ALWAYS verify tests pass before AND after changes.
 You preserve all existing behavior - refactoring must be invisible to users.
-You prioritize maintainability and readability.`;
+You prioritize maintainability and readability.
+
+When refactoring is complete and all tests pass, you MUST say "Refactoring complete - all tests passing" to indicate completion.`;
 
 function getRefactorPrompt(
   target: string,
@@ -122,6 +125,34 @@ Refactor the target code to improve quality while preserving behavior.
 When refactoring is complete and all tests pass, say "Refactoring complete - all tests passing" to indicate completion.`;
 }
 
+function getContinuationPrompt(target: string, focus: string): string {
+  return `# Continue Refactoring
+
+You are continuing work on refactoring code. This is a fresh context window.
+
+## Target
+${target || "Continue improving the codebase."}
+
+## Focus
+${focus}
+
+## Instructions
+
+1. Run tests to check current state
+2. Review what refactoring has been done (check git log)
+3. Continue with the next improvement
+4. Verify tests pass after each change
+5. Make incremental, safe changes
+
+## Critical Rules
+
+- Tests must pass before AND after every change
+- No behavior changes - refactoring is invisible to users
+- Incremental changes only
+
+When refactoring is complete and all tests pass, say "Refactoring complete - all tests passing" to indicate completion.`;
+}
+
 /**
  * Run the refactor agent
  */
@@ -132,77 +163,56 @@ export async function runRefactor(options: RefactorOptions): Promise<void> {
     focus = "all",
     depth,
     model = "claude-sonnet-4-5",
+    maxIterations,
   } = options;
 
-  const config = getDepthConfig(depth);
+  const depthConfig = getDepthConfig(depth);
+  const resolvedProjectDir = resolve(projectDir);
 
-  console.log("\n" + "=".repeat(70));
-  console.log("  REFACTOR AGENT");
-  console.log("=".repeat(70));
-  console.log(`\nProject: ${resolve(projectDir)}`);
-  console.log(`Model: ${model}`);
-  console.log(`Depth: ${depth}`);
+  // Print header
+  printAgentHeader("Refactor Agent", resolvedProjectDir, model, depthConfig, maxIterations);
+
   console.log(`Focus: ${focus}`);
-  console.log(`Budget: $${config.maxBudgetUsd.toFixed(2)}`);
   if (target) {
     console.log(`Target: ${target}`);
   }
   console.log();
 
-  const prompt = getRefactorPrompt(target, focus, depth);
+  // Completion markers for refactor
+  const isComplete = (response: string): boolean => {
+    const lower = response.toLowerCase();
+    return (
+      lower.includes("refactoring complete") ||
+      lower.includes("all tests passing") ||
+      lower.includes("refactor complete") ||
+      lower.includes("successfully refactored")
+    );
+  };
 
-  try {
-    const response = query({
-      prompt,
-      options: {
-        model,
-        workingDirectory: resolve(projectDir),
-        systemPrompt: SYSTEM_PROMPT,
-        maxBudgetUsd: config.maxBudgetUsd,
-        permissionMode: getPermissionMode(depth),
-        canUseTool: createPermissionCallback("refactor"),
+  // Run multi-session agent
+  const result = await runMultiSessionAgent(
+    {
+      projectDir: resolvedProjectDir,
+      model,
+      depthConfig,
+      agentType: "refactor",
+      systemPrompt: SYSTEM_PROMPT,
+      maxIterations,
+    },
+    {
+      getPrompt: (iteration) => {
+        if (iteration === 1) {
+          return getRefactorPrompt(target, focus, depth);
+        }
+        return getContinuationPrompt(target, focus);
       },
-    });
-
-    for await (const message of response) {
-      switch (message.type) {
-        case "system":
-          if (message.subtype === "init") {
-            console.log(`Session: ${message.session_id}\n`);
-            console.log("-".repeat(70) + "\n");
-          }
-          break;
-
-        case "assistant":
-          if (typeof message.content === "string") {
-            process.stdout.write(message.content);
-          }
-          break;
-
-        case "tool_call":
-          console.log(`\n[Tool: ${message.tool_name}]`);
-          break;
-
-        case "tool_result":
-          console.log(`[Done]`);
-          break;
-
-        case "error":
-          console.error(`\n[Error: ${message.error}]`);
-          break;
-      }
+      isComplete,
+      onComplete: () => {
+        console.log("Refactoring complete!");
+      },
     }
+  );
 
-    console.log("\n\n" + "=".repeat(70));
-    console.log("  SESSION ENDED");
-    console.log("=".repeat(70) + "\n");
-
-  } catch (err) {
-    const error = err as Error;
-    if (error.message?.includes("budget")) {
-      console.error(`\nBudget limit reached ($${config.maxBudgetUsd})`);
-    } else {
-      throw error;
-    }
-  }
+  // Print summary
+  printCompletionSummary("Refactor Agent", result.completed, result.iterations);
 }

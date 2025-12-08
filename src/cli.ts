@@ -35,6 +35,7 @@ program
   .option("-f, --error-file <path>", "Path to file containing error log")
   .option("-d, --depth <level>", "How thorough: quick, standard, thorough", "standard")
   .option("-m, --model <name>", "Claude model to use", DEFAULT_MODEL)
+  .option("-i, --max-iterations <number>", "Max iterations (overrides depth preset)")
   .action(async (options) => {
     // Validate inputs
     if (!options.error && !options.errorFile) {
@@ -59,6 +60,7 @@ program
         errorFile: options.errorFile ? resolve(options.errorFile) : undefined,
         depth: options.depth as DepthLevel,
         model: options.model,
+        maxIterations: options.maxIterations ? parseInt(options.maxIterations, 10) : undefined,
       });
     } catch (err) {
       console.error("Fatal error:", err);
@@ -75,6 +77,7 @@ program
   .option("-f, --spec-file <path>", "Path to feature specification file")
   .option("-d, --depth <level>", "How thorough: quick, standard, thorough", "standard")
   .option("-m, --model <name>", "Claude model to use", DEFAULT_MODEL)
+  .option("-i, --max-iterations <number>", "Max iterations (overrides depth preset)")
   .action(async (options) => {
     if (!options.spec && !options.specFile) {
       console.error("Error: Must provide either --spec or --spec-file");
@@ -98,6 +101,7 @@ program
         specFile: options.specFile ? resolve(options.specFile) : undefined,
         depth: options.depth as DepthLevel,
         model: options.model,
+        maxIterations: options.maxIterations ? parseInt(options.maxIterations, 10) : undefined,
       });
     } catch (err) {
       console.error("Fatal error:", err);
@@ -114,6 +118,7 @@ program
   .option("--focus <area>", "Focus area: performance, readability, patterns, all", "all")
   .option("-d, --depth <level>", "How thorough: quick, standard, thorough", "standard")
   .option("-m, --model <name>", "Claude model to use", DEFAULT_MODEL)
+  .option("-i, --max-iterations <number>", "Max iterations (overrides depth preset)")
   .action(async (options) => {
     if (!existsSync(options.project)) {
       console.error(`Error: Project directory not found: ${options.project}`);
@@ -127,6 +132,7 @@ program
         focus: options.focus as "performance" | "readability" | "patterns" | "all",
         depth: options.depth as DepthLevel,
         model: options.model,
+        maxIterations: options.maxIterations ? parseInt(options.maxIterations, 10) : undefined,
       });
     } catch (err) {
       console.error("Fatal error:", err);
@@ -155,10 +161,13 @@ Examples:
   # Comprehensive refactoring
   $ ai-agent refactor -p ./my-app -d thorough
 
+  # Override max iterations for a long-running task
+  $ ai-agent feature -p ./my-app -f ./spec.md -i 50
+
 Depth Levels:
-  quick     - Fast, minimal analysis. Trust user's diagnosis. Budget: $0.50
-  standard  - Balanced exploration and implementation. Budget: $2.00 (default)
-  thorough  - Comprehensive analysis, extensive testing. Budget: $10.00
+  quick     - Fast, minimal analysis. Trust user's diagnosis. Max iterations: 5
+  standard  - Balanced exploration and implementation. Max iterations: 20 (default)
+  thorough  - Comprehensive analysis, extensive testing. Max iterations: unlimited
 `);
 
 program.parse();

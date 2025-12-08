@@ -15,7 +15,6 @@ export {
 } from "./depth";
 
 export {
-  type PermissionDecision,
   type AgentType,
   createPermissionCallback,
   getPermissionMode,
@@ -27,3 +26,11 @@ export {
   loadAndRenderPrompt,
   getPromptsDir,
 } from "./prompts";
+
+export {
+  type SessionConfig,
+  type SessionCallbacks,
+  runMultiSessionAgent,
+  printAgentHeader,
+  printCompletionSummary,
+} from "./session";

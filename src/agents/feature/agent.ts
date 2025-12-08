@@ -10,7 +10,6 @@
  * 4. Writes tests matching existing test patterns
  */
 
-import { query } from "@anthropic-ai/claude-agent-sdk";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 
@@ -19,11 +18,12 @@ import {
   getDepthConfig,
   getDepthPromptContext,
 } from "../../core/depth";
-import {
-  createPermissionCallback,
-  getPermissionMode,
-} from "../../core/permissions";
 import { loadAndRenderPrompt } from "../../core/prompts";
+import {
+  runMultiSessionAgent,
+  printAgentHeader,
+  printCompletionSummary,
+} from "../../core/session";
 
 const PROMPTS_DIR = resolve(dirname(import.meta.path), "prompts");
 
@@ -33,13 +33,16 @@ export interface FeatureOptions {
   specText?: string;
   depth: DepthLevel;
   model?: string;
+  maxIterations?: number;
 }
 
 const SYSTEM_PROMPT = `You are an expert software developer focused on adding features to existing codebases.
 You analyze existing patterns and conventions before implementing.
 You write code that looks like it belongs in the codebase.
 You write tests that match the existing test style.
-You make incremental, reviewable changes.`;
+You make incremental, reviewable changes.
+
+When implementation is complete and verified, you MUST say "Feature implementation complete" to indicate completion.`;
 
 function getFeaturePrompt(spec: string, depth: DepthLevel): string {
   const config = getDepthConfig(depth);
@@ -98,6 +101,25 @@ Implement this feature following the codebase's existing patterns and convention
 When implementation is complete and verified, say "Feature implementation complete" to indicate completion.`;
 }
 
+function getContinuationPrompt(spec: string): string {
+  return `# Continue Feature Implementation
+
+You are continuing work on implementing a feature. This is a fresh context window.
+
+## Feature Specification
+${spec}
+
+## Instructions
+
+1. Check the current state of the implementation
+2. Review what has been done so far (check git log, modified files)
+3. Continue implementing the remaining functionality
+4. Write tests for new code
+5. Verify everything works together
+
+When implementation is complete and verified, say "Feature implementation complete" to indicate completion.`;
+}
+
 /**
  * Run the feature agent
  */
@@ -108,6 +130,7 @@ export async function runFeature(options: FeatureOptions): Promise<void> {
     specText,
     depth,
     model = "claude-sonnet-4-5",
+    maxIterations,
   } = options;
 
   // Load spec
@@ -121,71 +144,51 @@ export async function runFeature(options: FeatureOptions): Promise<void> {
     process.exit(1);
   }
 
-  const config = getDepthConfig(depth);
+  const depthConfig = getDepthConfig(depth);
+  const resolvedProjectDir = resolve(projectDir);
 
-  console.log("\n" + "=".repeat(70));
-  console.log("  FEATURE AGENT");
-  console.log("=".repeat(70));
-  console.log(`\nProject: ${resolve(projectDir)}`);
-  console.log(`Model: ${model}`);
-  console.log(`Depth: ${depth}`);
-  console.log(`Budget: $${config.maxBudgetUsd.toFixed(2)}`);
-  console.log();
+  // Print header
+  printAgentHeader("Feature Agent", resolvedProjectDir, model, depthConfig, maxIterations);
 
-  const prompt = getFeaturePrompt(spec, depth);
+  console.log(`Spec (${spec.length} chars):`);
+  const preview = spec.length > 300 ? spec.slice(0, 300) + "..." : spec;
+  console.log(`  ${preview}\n`);
 
-  try {
-    const response = query({
-      prompt,
-      options: {
-        model,
-        workingDirectory: resolve(projectDir),
-        systemPrompt: SYSTEM_PROMPT,
-        maxBudgetUsd: config.maxBudgetUsd,
-        permissionMode: getPermissionMode(depth),
-        canUseTool: createPermissionCallback("feature"),
+  // Completion markers for feature
+  const isComplete = (response: string): boolean => {
+    const lower = response.toLowerCase();
+    return (
+      lower.includes("feature implementation complete") ||
+      lower.includes("implementation complete") ||
+      lower.includes("feature complete") ||
+      lower.includes("successfully implemented")
+    );
+  };
+
+  // Run multi-session agent
+  const result = await runMultiSessionAgent(
+    {
+      projectDir: resolvedProjectDir,
+      model,
+      depthConfig,
+      agentType: "feature",
+      systemPrompt: SYSTEM_PROMPT,
+      maxIterations,
+    },
+    {
+      getPrompt: (iteration) => {
+        if (iteration === 1) {
+          return getFeaturePrompt(spec, depth);
+        }
+        return getContinuationPrompt(spec);
       },
-    });
-
-    for await (const message of response) {
-      switch (message.type) {
-        case "system":
-          if (message.subtype === "init") {
-            console.log(`Session: ${message.session_id}\n`);
-            console.log("-".repeat(70) + "\n");
-          }
-          break;
-
-        case "assistant":
-          if (typeof message.content === "string") {
-            process.stdout.write(message.content);
-          }
-          break;
-
-        case "tool_call":
-          console.log(`\n[Tool: ${message.tool_name}]`);
-          break;
-
-        case "tool_result":
-          console.log(`[Done]`);
-          break;
-
-        case "error":
-          console.error(`\n[Error: ${message.error}]`);
-          break;
-      }
+      isComplete,
+      onComplete: () => {
+        console.log("Feature implementation complete!");
+      },
     }
+  );
 
-    console.log("\n\n" + "=".repeat(70));
-    console.log("  SESSION ENDED");
-    console.log("=".repeat(70) + "\n");
-
-  } catch (err) {
-    const error = err as Error;
-    if (error.message?.includes("budget")) {
-      console.error(`\nBudget limit reached ($${config.maxBudgetUsd})`);
-    } else {
-      throw error;
-    }
-  }
+  // Print summary
+  printCompletionSummary("Feature Agent", result.completed, result.iterations);
 }
