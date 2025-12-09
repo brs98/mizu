@@ -28,7 +28,7 @@ bun install
 
 Requires:
 - [Bun](https://bun.sh) runtime
-- `ANTHROPIC_API_KEY` environment variable
+- [Claude Code](https://claude.ai/download) with an active subscription
 
 ## Quick Start
 
