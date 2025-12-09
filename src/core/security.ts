@@ -498,7 +498,7 @@ function validateInitScript(command: string): ValidationResult {
 /**
  * Get allowed commands for an agent type
  */
-function getAllowedCommands(agentType: AgentType | "builder" | "migrator"): Set<string> {
+function getAllowedCommands(agentType: AgentType | "builder" | "migrator" | "scaffold"): Set<string> {
   const commands = new Set(BASE_ALLOWED_COMMANDS);
 
   // All agent types get dev commands
@@ -512,7 +512,7 @@ function getAllowedCommands(agentType: AgentType | "builder" | "migrator"): Set<
  */
 export function validateBashCommand(
   command: string,
-  agentType: AgentType | "builder" | "migrator"
+  agentType: AgentType | "builder" | "migrator" | "scaffold"
 ): ValidationResult {
   // Check for dangerous patterns first (defense in depth)
   for (const pattern of DANGEROUS_PATTERNS) {
@@ -582,7 +582,7 @@ interface CanUseToolOptions {
  * This is an enhanced version that uses proper shell parsing
  */
 export function createSecurePermissionCallback(
-  agentType: AgentType | "builder" | "migrator"
+  agentType: AgentType | "builder" | "migrator" | "scaffold"
 ): CanUseTool {
   return async (
     toolName: string,

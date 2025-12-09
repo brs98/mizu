@@ -19,7 +19,7 @@ import { join, dirname } from "node:path";
 // =============================================================================
 
 export type AgentMode = "quick" | "long-running";
-export type LongRunningAgentType = "builder" | "migrator";
+export type LongRunningAgentType = "builder" | "migrator" | "scaffold";
 
 export interface BaseState {
   version: string;
@@ -90,10 +90,39 @@ export interface MigratorState extends BaseState {
 }
 
 // =============================================================================
+// Scaffold State (Package/Project Scaffolding)
+// =============================================================================
+
+export type ScaffoldTaskStatus = "pending" | "in_progress" | "completed" | "skipped" | "blocked";
+
+export interface ScaffoldTask {
+  id: string;
+  description: string;
+  status: ScaffoldTaskStatus;
+  verificationCommand?: string; // Command to run to verify task completion
+  verificationPattern?: string; // Pattern to match in output to confirm success
+  dependencies: string[]; // Task IDs this depends on
+  completedAt?: string;
+  notes?: string;
+}
+
+export interface ScaffoldState extends BaseState {
+  type: "scaffold";
+  specFile?: string;
+  specText?: string;
+  referenceDir?: string; // Directory containing reference implementation to copy patterns from
+  additionalReadPaths: string[]; // Other directories the agent can read from
+  tasks: ScaffoldTask[];
+  completedTasks: number;
+  totalTasks: number;
+  verificationCommands: string[]; // Commands to run at the end to verify everything works
+}
+
+// =============================================================================
 // Union Type
 // =============================================================================
 
-export type ProjectState = BuilderState | MigratorState;
+export type ProjectState = BuilderState | MigratorState | ScaffoldState;
 
 // =============================================================================
 // File Paths
@@ -102,6 +131,7 @@ export type ProjectState = BuilderState | MigratorState;
 const STATE_FILE = ".ai-agent-state.json";
 const FEATURE_LIST_FILE = "feature_list.json";
 const MIGRATION_MANIFEST_FILE = "migration_manifest.json";
+const SCAFFOLD_TASKS_FILE = "scaffold_tasks.json";
 const PROGRESS_FILE = "claude-progress.txt";
 
 export function getStateFilePath(projectDir: string): string {
@@ -114,6 +144,10 @@ export function getFeatureListPath(projectDir: string): string {
 
 export function getMigrationManifestPath(projectDir: string): string {
   return join(projectDir, MIGRATION_MANIFEST_FILE);
+}
+
+export function getScaffoldTasksPath(projectDir: string): string {
+  return join(projectDir, SCAFFOLD_TASKS_FILE);
 }
 
 export function getProgressFilePath(projectDir: string): string {
@@ -193,6 +227,14 @@ export function loadMigratorState(projectDir: string): MigratorState | null {
   return null;
 }
 
+export function loadScaffoldState(projectDir: string): ScaffoldState | null {
+  const state = loadState(projectDir);
+  if (state?.type === "scaffold") {
+    return state;
+  }
+  return null;
+}
+
 // =============================================================================
 // State Creation
 // =============================================================================
@@ -251,6 +293,38 @@ export function createMigratorState(options: CreateMigratorStateOptions): Migrat
   };
 }
 
+export interface CreateScaffoldStateOptions {
+  projectDir: string;
+  model: string;
+  specFile?: string;
+  specText?: string;
+  referenceDir?: string;
+  additionalReadPaths?: string[];
+  verificationCommands?: string[];
+}
+
+export function createScaffoldState(options: CreateScaffoldStateOptions): ScaffoldState {
+  const now = new Date().toISOString();
+  return {
+    version: "1.0.0",
+    type: "scaffold",
+    initialized: false,
+    sessionCount: 0,
+    createdAt: now,
+    updatedAt: now,
+    model: options.model,
+    projectDir: options.projectDir,
+    specFile: options.specFile,
+    specText: options.specText,
+    referenceDir: options.referenceDir,
+    additionalReadPaths: options.additionalReadPaths ?? [],
+    tasks: [],
+    completedTasks: 0,
+    totalTasks: 0,
+    verificationCommands: options.verificationCommands ?? ["pnpm typecheck", "pnpm build"],
+  };
+}
+
 // =============================================================================
 // State Saving
 // =============================================================================
@@ -274,6 +348,9 @@ export function saveState(state: ProjectState): void {
   } else if (state.type === "migrator") {
     state.totalFiles = state.files.length;
     state.completedFiles = state.files.filter((f) => f.status === "migrated").length;
+  } else if (state.type === "scaffold") {
+    state.totalTasks = state.tasks.length;
+    state.completedTasks = state.tasks.filter((t) => t.status === "completed").length;
   }
 
   writeFileSync(statePath, JSON.stringify(state, null, 2));
@@ -398,6 +475,73 @@ export function getMigrationProgress(files: MigrationFile[]): {
 }
 
 // =============================================================================
+// Scaffold Tasks Management
+// =============================================================================
+
+export function loadScaffoldTasks(projectDir: string): ScaffoldTask[] {
+  const tasksPath = getScaffoldTasksPath(projectDir);
+  if (!existsSync(tasksPath)) {
+    return [];
+  }
+
+  try {
+    const content = readFileSync(tasksPath, "utf-8");
+    return JSON.parse(content) as ScaffoldTask[];
+  } catch (error) {
+    console.error(`Failed to load scaffold tasks from ${tasksPath}:`, error);
+    return [];
+  }
+}
+
+export function saveScaffoldTasks(projectDir: string, tasks: ScaffoldTask[]): void {
+  const tasksPath = getScaffoldTasksPath(projectDir);
+  writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
+}
+
+export function syncTasksFromFile(state: ScaffoldState): ScaffoldState {
+  const tasks = loadScaffoldTasks(state.projectDir);
+  return {
+    ...state,
+    tasks,
+    totalTasks: tasks.length,
+    completedTasks: tasks.filter((t) => t.status === "completed").length,
+  };
+}
+
+export function getNextPendingTask(tasks: ScaffoldTask[]): ScaffoldTask | null {
+  // Find tasks that are pending and have all dependencies completed
+  return (
+    tasks.find((t) => {
+      if (t.status !== "pending") return false;
+      // Check all dependencies are completed
+      return t.dependencies.every((dep) => {
+        const depTask = tasks.find((dt) => dt.id === dep);
+        return depTask?.status === "completed";
+      });
+    }) ?? null
+  );
+}
+
+export function getScaffoldProgress(tasks: ScaffoldTask[]): {
+  total: number;
+  completed: number;
+  pending: number;
+  inProgress: number;
+  blocked: number;
+  skipped: number;
+  percentage: number;
+} {
+  const total = tasks.length;
+  const completed = tasks.filter((t) => t.status === "completed").length;
+  const pending = tasks.filter((t) => t.status === "pending").length;
+  const inProgress = tasks.filter((t) => t.status === "in_progress").length;
+  const blocked = tasks.filter((t) => t.status === "blocked").length;
+  const skipped = tasks.filter((t) => t.status === "skipped").length;
+  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+  return { total, completed, pending, inProgress, blocked, skipped, percentage };
+}
+
+// =============================================================================
 // Progress File Management
 // =============================================================================
 
@@ -489,11 +633,36 @@ export function printMigratorProgress(state: MigratorState): void {
   console.log("-".repeat(50) + "\n");
 }
 
+export function printScaffoldProgress(state: ScaffoldState): void {
+  const progress = getScaffoldProgress(state.tasks);
+
+  console.log("\n" + "-".repeat(50));
+  console.log("  SCAFFOLD PROGRESS");
+  console.log("-".repeat(50));
+  console.log(`  Sessions completed: ${state.sessionCount}`);
+  console.log(`  Tasks: ${progress.completed}/${progress.total} completed (${progress.percentage}%)`);
+  if (progress.inProgress > 0) console.log(`  In progress: ${progress.inProgress}`);
+  if (progress.blocked > 0) console.log(`  Blocked: ${progress.blocked}`);
+  if (progress.skipped > 0) console.log(`  Skipped: ${progress.skipped}`);
+
+  if (progress.pending > 0) {
+    const nextTask = getNextPendingTask(state.tasks);
+    if (nextTask) {
+      console.log(`  Next task: ${nextTask.description.slice(0, 50)}...`);
+    }
+  } else if (progress.completed === progress.total) {
+    console.log("  Status: ALL TASKS COMPLETED!");
+  }
+  console.log("-".repeat(50) + "\n");
+}
+
 export function printProgress(state: ProjectState): void {
   if (state.type === "builder") {
     printBuilderProgress(state);
-  } else {
+  } else if (state.type === "migrator") {
     printMigratorProgress(state);
+  } else if (state.type === "scaffold") {
+    printScaffoldProgress(state);
   }
 }
 
@@ -504,10 +673,16 @@ export function printProgress(state: ProjectState): void {
 export function isComplete(state: ProjectState): boolean {
   if (state.type === "builder") {
     return state.features.length > 0 && state.features.every((f) => f.passes);
-  } else {
+  } else if (state.type === "migrator") {
     return (
       state.files.length > 0 &&
       state.files.every((f) => f.status === "migrated" || f.status === "skipped")
     );
+  } else if (state.type === "scaffold") {
+    return (
+      state.tasks.length > 0 &&
+      state.tasks.every((t) => t.status === "completed" || t.status === "skipped")
+    );
   }
+  return false;
 }

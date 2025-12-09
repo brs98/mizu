@@ -13,7 +13,7 @@
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { resolve } from "node:path";
 
-import type { ProjectState, BuilderState, MigratorState } from "./state";
+import type { ProjectState, BuilderState, MigratorState, ScaffoldState } from "./state";
 import { createSecurePermissionCallback, bashSecurityHook } from "./security";
 import { createSettingsFile, printSecuritySummary, generateSettings } from "./sandbox";
 import { buildMCPServersConfig, BUILTIN_TOOLS, PUPPETEER_TOOLS } from "./mcp";
@@ -25,7 +25,7 @@ import { buildMCPServersConfig, BUILTIN_TOOLS, PUPPETEER_TOOLS } from "./mcp";
 export interface LongRunningConfig {
   projectDir: string;
   model: string;
-  agentType: "builder" | "migrator";
+  agentType: "builder" | "migrator" | "scaffold";
   systemPrompt: string;
   maxSessions?: number;
   enablePuppeteer?: boolean;
@@ -73,7 +73,7 @@ interface ClientConfig {
   systemPrompt: string;
   settingsPath: string;
   enablePuppeteer: boolean;
-  agentType: "builder" | "migrator";
+  agentType: "builder" | "migrator" | "scaffold";
 }
 
 function createQueryOptions(config: ClientConfig) {
@@ -311,7 +311,7 @@ export interface LongRunningHeaderOptions {
   agentName: string;
   projectDir: string;
   model: string;
-  stateType: "builder" | "migrator";
+  stateType: "builder" | "migrator" | "scaffold";
   initialized: boolean;
   sessionCount: number;
   maxSessions?: number;
@@ -360,6 +360,11 @@ export function printLongRunningCompletion(options: LongRunningCompletionOptions
     const total = migratorState.files.length;
     const migrated = migratorState.files.filter((f) => f.status === "migrated").length;
     console.log(`Files: ${migrated}/${total} migrated`);
+  } else if (state.type === "scaffold") {
+    const scaffoldState = state as ScaffoldState;
+    const total = scaffoldState.tasks.length;
+    const completed = scaffoldState.tasks.filter((t) => t.status === "completed").length;
+    console.log(`Tasks: ${completed}/${total} completed`);
   }
 
   console.log();

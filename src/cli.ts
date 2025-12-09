@@ -24,6 +24,7 @@ import { runFeature } from "./agents/feature";
 import { runRefactor } from "./agents/refactor";
 import { runBuilder } from "./agents/builder";
 import { runMigrator } from "./agents/migrator";
+import { runScaffold } from "./agents/scaffold";
 import type { DepthLevel } from "./core/depth";
 import {
   hasExistingState,
@@ -32,8 +33,10 @@ import {
   printProgress,
   getFeatureProgress,
   getMigrationProgress,
+  getScaffoldProgress,
   type BuilderState,
   type MigratorState,
+  type ScaffoldState,
 } from "./core/state";
 
 const DEFAULT_MODEL = "claude-sonnet-4-5";
@@ -257,6 +260,19 @@ program
           model: options.model,
           maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
         });
+      } else if (stateType === "scaffold") {
+        // Load state to get reference dir and read paths
+        const state = loadState(projectDir) as ScaffoldState;
+        await runScaffold({
+          projectDir,
+          specFile: state.specFile,
+          specText: state.specText,
+          referenceDir: state.referenceDir,
+          additionalReadPaths: state.additionalReadPaths,
+          verificationCommands: state.verificationCommands,
+          model: options.model,
+          maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
+        });
       } else {
         console.error(`Error: Unknown state type: ${stateType}`);
         process.exit(1);
@@ -301,6 +317,71 @@ program
         targetDir: options.target,
         migrationType: options.type,
         swaggerPath: options.swagger ? resolve(options.swagger) : undefined,
+        model: options.model,
+        maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
+      });
+    } catch (err) {
+      console.error("Fatal error:", err);
+      process.exit(1);
+    }
+  });
+
+// Scaffold command (long-running)
+program
+  .command("scaffold")
+  .description("Scaffold new packages/projects from specifications (long-running)")
+  .requiredOption("-p, --project <path>", "Project directory to create/work in")
+  .option("-s, --spec <text>", "Specification text describing what to build")
+  .option("-f, --spec-file <path>", "Path to specification file (e.g., PRD)")
+  .option("-r, --reference <path>", "Reference directory to copy patterns from")
+  .option("--read-paths <paths>", "Additional directories the agent can read (comma-separated)")
+  .option("--verify <commands>", "Verification commands to run at completion (comma-separated)", "pnpm typecheck,pnpm build")
+  .option("-m, --model <name>", "Claude model to use", DEFAULT_MODEL)
+  .option("--max-sessions <number>", "Maximum number of sessions")
+  .action(async (options) => {
+    if (!options.spec && !options.specFile) {
+      console.error("Error: Must provide either --spec or --spec-file");
+      process.exit(1);
+    }
+
+    if (options.specFile && !existsSync(options.specFile)) {
+      console.error(`Error: Spec file not found: ${options.specFile}`);
+      process.exit(1);
+    }
+
+    const projectDir = resolve(options.project);
+
+    // Check if project already has state
+    if (hasExistingState(projectDir)) {
+      const existingType = detectStateType(projectDir);
+      if (existingType === "scaffold") {
+        console.log("\nNote: Project already has scaffold state.");
+        console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
+        process.exit(1);
+      } else {
+        console.error(`Error: Project has existing ${existingType} state.`);
+        process.exit(1);
+      }
+    }
+
+    // Parse additional read paths
+    const additionalReadPaths = options.readPaths
+      ? options.readPaths.split(",").map((p: string) => resolve(p.trim()))
+      : [];
+
+    // Parse verification commands
+    const verificationCommands = options.verify
+      ? options.verify.split(",").map((c: string) => c.trim())
+      : ["pnpm typecheck", "pnpm build"];
+
+    try {
+      await runScaffold({
+        projectDir,
+        specText: options.spec,
+        specFile: options.specFile ? resolve(options.specFile) : undefined,
+        referenceDir: options.reference ? resolve(options.reference) : undefined,
+        additionalReadPaths,
+        verificationCommands,
         model: options.model,
         maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
       });
@@ -355,6 +436,22 @@ program
         );
       } else if (state.type === "migrator") {
         const progress = getMigrationProgress((state as MigratorState).files);
+        console.log(
+          JSON.stringify(
+            {
+              type: state.type,
+              initialized: state.initialized,
+              sessionCount: state.sessionCount,
+              createdAt: state.createdAt,
+              updatedAt: state.updatedAt,
+              progress,
+            },
+            null,
+            2
+          )
+        );
+      } else if (state.type === "scaffold") {
+        const progress = getScaffoldProgress((state as ScaffoldState).tasks);
         console.log(
           JSON.stringify(
             {
@@ -428,6 +525,12 @@ Examples:
   # Migrate schemas from Zod to OpenAPI types
   $ ai-agent migrate -p ./migration-state -s src/schemas --swagger ./swagger.json
 
+  # Scaffold a new package from a PRD with reference implementation
+  $ ai-agent scaffold -p ./packages/new-api-client -f ./prd.md -r ./packages/existing-client
+
+  # Scaffold with additional read paths (for cross-repo access)
+  $ ai-agent scaffold -p ./my-package -f ./spec.md --read-paths "/path/to/backend,/path/to/shared"
+
   # Resume a long-running task
   $ ai-agent resume -p ./my-app
 
@@ -441,10 +544,11 @@ Depth Levels (for quick tasks):
   thorough  - Comprehensive analysis, extensive testing. Max iterations: unlimited
 
 Long-Running Tasks:
-  'build'   - Build complete applications with browser testing and feature tracking
-  'migrate' - Migrate schemas across codebases with dependency-aware ordering
+  'build'    - Build complete applications with browser testing and feature tracking
+  'migrate'  - Migrate schemas across codebases with dependency-aware ordering
+  'scaffold' - Scaffold new packages/projects from specifications with reference support
 
-  Both support:
+  All support:
   - Persistent state for crash recovery
   - Git-based progress tracking
   - Resume from any point with 'resume' command
