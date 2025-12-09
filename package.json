@@ -1,7 +1,7 @@
 {
   "name": "ai-agents",
-  "version": "0.1.0",
-  "description": "Specialized AI agents for software engineering tasks",
+  "version": "0.2.0",
+  "description": "Specialized AI agents for software engineering tasks - from quick fixes to full app development",
   "type": "module",
   "main": "src/cli.ts",
   "bin": {
@@ -12,6 +12,9 @@
     "bugfix": "bun run src/cli.ts bugfix",
     "feature": "bun run src/cli.ts feature",
     "refactor": "bun run src/cli.ts refactor",
+    "build": "bun run src/cli.ts build",
+    "resume": "bun run src/cli.ts resume",
+    "status": "bun run src/cli.ts status",
     "typecheck": "bun x tsc --noEmit",
     "lint": "bun x eslint src/"
   },

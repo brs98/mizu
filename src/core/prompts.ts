@@ -18,6 +18,11 @@ export function loadPrompt(promptPath: string): string {
 }
 
 /**
+ * Context type for prompt rendering
+ */
+export type PromptContext = Record<string, string | number | boolean | undefined>;
+
+/**
  * Simple template rendering for prompts
  *
  * Supports:
@@ -27,7 +32,7 @@ export function loadPrompt(promptPath: string): string {
  */
 export function renderPrompt(
   template: string,
-  context: Record<string, string | number | boolean>
+  context: PromptContext
 ): string {
   let result = template;
 
@@ -59,7 +64,7 @@ export function renderPrompt(
  */
 export function loadAndRenderPrompt(
   promptPath: string,
-  context: Record<string, string | number | boolean>
+  context: PromptContext
 ): string {
   const template = loadPrompt(promptPath);
   return renderPrompt(template, context);
