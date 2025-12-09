@@ -184,3 +184,60 @@ Current progress will be shown here:
 - Remaining: {{ remaining_features }}
 
 **Your goal this session:** Implement one more feature and leave the environment better than you found it.
+
+---
+
+## Final Session Protocol
+
+**When ALL features in feature_list.json have `"passes": true`:**
+
+### 1. Final Validation
+```bash
+# Run full test suite
+npm test
+# Type check
+npm run typecheck || pnpm typecheck
+# Lint
+npm run lint || pnpm lint
+```
+
+Fix any failures before proceeding.
+
+### 2. Cleanup AI Artifacts
+Remove files created for the AI workflow:
+```bash
+rm -f .ai-agent-state.json
+rm -f feature_list.json
+rm -f claude-progress.txt
+rm -f init.sh
+```
+
+### 3. Final Commit
+```bash
+git add -A
+git commit -m "chore: cleanup AI agent artifacts"
+```
+
+### 4. Create Pull Request
+```bash
+# Ensure on feature branch (not main)
+git push -u origin $(git branch --show-current)
+
+gh pr create --title "<descriptive title>" --body "$(cat <<'EOF'
+## Summary
+<2-3 sentences describing what was built>
+
+## Changes
+<bullet list of major features implemented>
+
+## Testing
+- All feature tests passing
+- Type check clean
+- Lint clean
+
+🤖 Built with AI Agents
+EOF
+)"
+```
+
+Generate the title and summary based on what you built. Return the PR URL and say "Build complete - PR created" to indicate completion.

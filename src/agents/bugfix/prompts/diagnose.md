@@ -52,4 +52,12 @@ Report your findings:
 Then apply the fix and verify it works.
 {% endif %}
 
+## Scope Discipline
+
+**Surgical fixes only.** Change the minimum code necessary to resolve the bug.
+
+Do NOT: refactor, add comments to unchanged code, "clean up" nearby code, fix unrelated issues, or add error handling for hypothetical cases.
+
+If you notice other issues, list them in your summary but do not fix them.
+
 When the fix is verified and working, say "Fix verified - bug is resolved" to indicate completion.

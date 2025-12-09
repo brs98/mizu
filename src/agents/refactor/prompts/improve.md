@@ -99,4 +99,10 @@ Consider all aspects:
 
 Refactor the target code to improve quality while preserving behavior.
 
+## Scope Discipline
+
+**Only refactor within the specified target.** Do not expand scope to "related" code.
+
+Do NOT: add tests unless explicitly asked, touch code outside the target area, add documentation to unchanged files, or create new abstractions for one-time patterns.
+
 When refactoring is complete and all tests pass, say "Refactoring complete - all tests passing" to indicate completion.

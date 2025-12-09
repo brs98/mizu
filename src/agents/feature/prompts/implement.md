@@ -60,4 +60,10 @@ Ensure:
 
 Implement this feature following the codebase's existing patterns and conventions.
 
+## Scope Discipline
+
+**Implement exactly what the spec describes.** If ambiguous, choose the simplest interpretation.
+
+Do NOT: add "nice to have" functionality, refactor unrelated code, add extra configurability, or over-engineer for hypothetical future requirements.
+
 When implementation is complete and verified, say "Feature implementation complete" to indicate completion.

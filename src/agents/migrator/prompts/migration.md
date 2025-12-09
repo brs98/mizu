@@ -204,3 +204,61 @@ Before context fills up:
 ---
 
 **Your goal this session:** Migrate one file, leave codebase compiling, update all tracking files.
+
+---
+
+## Final Session Protocol
+
+**When ALL files in migration_manifest.json have `status: "migrated"` or `status: "skipped"`:**
+
+### 1. Final Validation
+```bash
+# Type check entire codebase
+pnpm typecheck || npm run typecheck
+# Run tests
+pnpm test || npm test
+# Lint
+pnpm lint || npm run lint
+```
+
+Fix any failures before proceeding.
+
+### 2. Cleanup AI Artifacts
+Remove files created for the AI workflow:
+```bash
+rm -f .ai-agent-state.json
+rm -f migration_manifest.json
+rm -f migration_plan.md
+rm -f migration_progress.txt
+```
+
+### 3. Final Commit
+```bash
+git add -A
+git commit -m "chore: cleanup AI agent artifacts"
+```
+
+### 4. Create Pull Request
+```bash
+# Ensure on feature branch (not main)
+git push -u origin $(git branch --show-current)
+
+gh pr create --title "<descriptive title>" --body "$(cat <<'EOF'
+## Summary
+<2-3 sentences describing the migration>
+
+## Migration Stats
+- Files migrated: <count>
+- Files skipped: <count with reasons if any>
+
+## Verification
+- Type check passing
+- All tests passing
+- No runtime errors
+
+🤖 Migrated with AI Agents
+EOF
+)"
+```
+
+Generate the title and summary based on the migration. Return the PR URL and say "Migration complete - PR created" to indicate completion.
