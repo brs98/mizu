@@ -33,7 +33,6 @@ import {
   incrementSession,
 } from "../../core/state";
 import { loadAndRenderPrompt, type PromptContext } from "../../core/prompts";
-import { getDepthConfig, type DepthLevel } from "../../core/depth";
 import {
   runLongRunningAgent,
   printLongRunningHeader,
@@ -54,7 +53,6 @@ export interface ScaffoldOptions {
   referenceDir?: string;
   additionalReadPaths?: string[];
   verificationCommands?: string[];
-  depth?: DepthLevel;
   model?: string;
   maxSessions?: number;
 }
@@ -355,13 +353,11 @@ function checkScaffoldCompletion(response: string, state: ScaffoldState): boolea
 export async function runScaffold(options: ScaffoldOptions): Promise<void> {
   const {
     projectDir,
-    depth = "standard",
     model = "claude-sonnet-4-5",
     maxSessions,
   } = options;
 
   const resolvedProjectDir = resolve(projectDir);
-  const depthConfig = getDepthConfig(depth);
 
   // Ensure project directory exists
   if (!existsSync(resolvedProjectDir)) {
@@ -409,7 +405,7 @@ export async function runScaffold(options: ScaffoldOptions): Promise<void> {
     model,
     agentType: "scaffold",
     systemPrompt: SYSTEM_PROMPT,
-    maxSessions: maxSessions ?? depthConfig.maxIterations,
+    maxSessions: maxSessions ?? Infinity,
     enablePuppeteer: false, // Scaffold doesn't need browser testing
     sandboxEnabled: true,
     additionalReadPaths,

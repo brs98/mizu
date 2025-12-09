@@ -185,16 +185,3 @@ export function createPermissionCallback(agentType: AgentType): CanUseTool {
   };
 }
 
-/**
- * Get the appropriate permission mode based on depth
- */
-export function getPermissionMode(depth: "quick" | "standard" | "thorough"): "acceptEdits" | "default" | "bypassPermissions" {
-  switch (depth) {
-    case "quick":
-      return "acceptEdits"; // Auto-approve edits for speed
-    case "standard":
-      return "default";
-    case "thorough":
-      return "default"; // Could use bypassPermissions for CI, but safer to default
-  }
-}

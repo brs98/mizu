@@ -11,16 +11,14 @@
  */
 
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { type DepthConfig } from "./depth";
-import { type AgentType, createPermissionCallback, getPermissionMode } from "./permissions";
+import { type AgentType, createPermissionCallback } from "./permissions";
 
 export interface SessionConfig {
   projectDir: string;
   model: string;
-  depthConfig: DepthConfig;
   agentType: AgentType;
   systemPrompt: string;
-  maxIterations?: number; // Override depth preset
+  maxIterations?: number; // Default: unlimited (Infinity)
 }
 
 export interface SessionCallbacks {
@@ -46,6 +44,8 @@ const DEFAULT_COMPLETION_MARKERS = [
   "all tests passing",
 ];
 
+const DEFAULT_AUTO_CONTINUE_DELAY_MS = 2000;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -60,10 +60,9 @@ export async function runMultiSessionAgent(
   const {
     projectDir,
     model,
-    depthConfig,
     agentType,
     systemPrompt,
-    maxIterations = depthConfig.maxIterations,
+    maxIterations = Infinity,
   } = config;
 
   const { getPrompt, onSessionStart, onSessionEnd, isComplete, onComplete } = callbacks;
@@ -99,7 +98,6 @@ export async function runMultiSessionAgent(
           model,
           cwd: projectDir,
           systemPrompt,
-          permissionMode: getPermissionMode(depthConfig.level),
           canUseTool: createPermissionCallback(agentType),
           // Resume previous session if we have one
           ...(sessionId ? { resume: sessionId } : {}),
@@ -169,9 +167,9 @@ export async function runMultiSessionAgent(
 
       // Auto-continue delay
       if (iteration < maxIterations) {
-        const delaySec = depthConfig.autoContinueDelayMs / 1000;
+        const delaySec = DEFAULT_AUTO_CONTINUE_DELAY_MS / 1000;
         console.log(`Continuing in ${delaySec}s... (Ctrl+C to stop)\n`);
-        await sleep(depthConfig.autoContinueDelayMs);
+        await sleep(DEFAULT_AUTO_CONTINUE_DELAY_MS);
       }
     } catch (err) {
       const error = err as Error;
@@ -185,9 +183,6 @@ export async function runMultiSessionAgent(
 
   if (!completed && iteration >= maxIterations) {
     console.log(`\nReached max iterations (${maxIterations})`);
-    if (depthConfig.level !== "thorough") {
-      console.log(`Tip: Use --depth thorough for unlimited iterations`);
-    }
   }
 
   return { iterations: iteration, completed, sessionId };
@@ -200,17 +195,15 @@ export function printAgentHeader(
   agentName: string,
   projectDir: string,
   model: string,
-  depthConfig: DepthConfig,
   maxIterations?: number
 ): void {
-  const iterations = maxIterations ?? depthConfig.maxIterations;
+  const iterations = maxIterations ?? Infinity;
 
   console.log("\n" + "=".repeat(70));
   console.log(`  ${agentName.toUpperCase()}`);
   console.log("=".repeat(70));
   console.log(`\nProject: ${projectDir}`);
   console.log(`Model: ${model}`);
-  console.log(`Depth: ${depthConfig.level}`);
   console.log(`Max iterations: ${iterations === Infinity ? "unlimited" : iterations}`);
   console.log();
 }

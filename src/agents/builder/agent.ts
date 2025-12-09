@@ -31,7 +31,6 @@ import {
   incrementSession,
 } from "../../core/state";
 import { loadAndRenderPrompt, type PromptContext } from "../../core/prompts";
-import { getDepthConfig, type DepthLevel } from "../../core/depth";
 import {
   runLongRunningAgent,
   printLongRunningHeader,
@@ -49,7 +48,6 @@ export interface BuilderOptions {
   projectDir: string;
   specFile?: string;
   specText?: string;
-  depth?: DepthLevel;
   model?: string;
   maxSessions?: number;
   minFeatures?: number;
@@ -272,13 +270,11 @@ function checkBuilderCompletion(response: string, state: BuilderState): boolean 
 export async function runBuilder(options: BuilderOptions): Promise<void> {
   const {
     projectDir,
-    depth = "standard",
     model = "claude-sonnet-4-5",
     maxSessions,
   } = options;
 
   const resolvedProjectDir = resolve(projectDir);
-  const depthConfig = getDepthConfig(depth);
 
   // Ensure project directory exists
   if (!existsSync(resolvedProjectDir)) {
@@ -317,7 +313,7 @@ export async function runBuilder(options: BuilderOptions): Promise<void> {
     model,
     agentType: "builder",
     systemPrompt: SYSTEM_PROMPT,
-    maxSessions: maxSessions ?? depthConfig.maxIterations,
+    maxSessions: maxSessions ?? Infinity,
     enablePuppeteer: true,
     sandboxEnabled: true,
 

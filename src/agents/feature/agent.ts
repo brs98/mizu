@@ -13,11 +13,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 
-import {
-  type DepthLevel,
-  getDepthConfig,
-  getDepthPromptContext,
-} from "../../core/depth";
 import { loadAndRenderPrompt } from "../../core/prompts";
 import {
   runMultiSessionAgent,
@@ -31,7 +26,6 @@ export interface FeatureOptions {
   projectDir: string;
   specFile?: string;
   specText?: string;
-  depth: DepthLevel;
   model?: string;
   maxIterations?: number;
 }
@@ -44,10 +38,8 @@ You make incremental, reviewable changes.
 
 When implementation is complete and verified, you MUST say "Feature implementation complete" to indicate completion.`;
 
-function getFeaturePrompt(spec: string, depth: DepthLevel): string {
-  const config = getDepthConfig(depth);
+function getFeaturePrompt(spec: string): string {
   const context = {
-    ...getDepthPromptContext(config),
     spec,
   };
 
@@ -58,37 +50,15 @@ function getFeaturePrompt(spec: string, depth: DepthLevel): string {
   }
 
   // Fallback to inline prompt
-  const depthInstructions = {
-    quick: `**QUICK MODE** - Fast implementation.
+  return `# Feature Implementation
 
-1. Read the spec and identify key files to modify
-2. Implement the feature directly
-3. Add minimal tests
-4. Skip extensive codebase exploration`,
-
-    standard: `**STANDARD MODE** - Balanced implementation.
+## Instructions
 
 1. Analyze existing code patterns in related areas
 2. Plan the implementation approach
 3. Implement following existing conventions
 4. Write tests matching existing test patterns
-5. Verify integration with existing features`,
-
-    thorough: `**THOROUGH MODE** - Comprehensive implementation.
-
-1. Full codebase analysis for patterns and conventions
-2. Design document with architectural considerations
-3. Implement with comprehensive error handling
-4. Full test coverage including edge cases
-5. Documentation updates
-6. Integration testing`,
-  };
-
-  return `# Feature Implementation
-
-## Depth: ${depth}
-
-${depthInstructions[depth]}
+5. Verify integration with existing features
 
 ## Feature Specification
 
@@ -128,7 +98,6 @@ export async function runFeature(options: FeatureOptions): Promise<void> {
     projectDir,
     specFile,
     specText,
-    depth,
     model = "claude-sonnet-4-5",
     maxIterations,
   } = options;
@@ -144,11 +113,10 @@ export async function runFeature(options: FeatureOptions): Promise<void> {
     process.exit(1);
   }
 
-  const depthConfig = getDepthConfig(depth);
   const resolvedProjectDir = resolve(projectDir);
 
   // Print header
-  printAgentHeader("Feature Agent", resolvedProjectDir, model, depthConfig, maxIterations);
+  printAgentHeader("Feature Agent", resolvedProjectDir, model, maxIterations);
 
   console.log(`Spec (${spec.length} chars):`);
   const preview = spec.length > 300 ? spec.slice(0, 300) + "..." : spec;
@@ -170,7 +138,6 @@ export async function runFeature(options: FeatureOptions): Promise<void> {
     {
       projectDir: resolvedProjectDir,
       model,
-      depthConfig,
       agentType: "feature",
       systemPrompt: SYSTEM_PROMPT,
       maxIterations,
@@ -178,7 +145,7 @@ export async function runFeature(options: FeatureOptions): Promise<void> {
     {
       getPrompt: (iteration) => {
         if (iteration === 1) {
-          return getFeaturePrompt(spec, depth);
+          return getFeaturePrompt(spec);
         }
         return getContinuationPrompt(spec);
       },

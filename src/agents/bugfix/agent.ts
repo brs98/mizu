@@ -4,21 +4,15 @@
  * A focused agent for diagnosing and fixing bugs from error logs and stack traces.
  *
  * Unlike general-purpose agents, the bug fix agent:
- * 1. Trusts the user's diagnosis (especially at quick depth)
- * 2. Makes minimal, targeted changes
- * 3. Verifies the fix without extensive refactoring
- * 4. Completes quickly for simple bugs
+ * 1. Makes minimal, targeted changes
+ * 2. Verifies the fix without extensive refactoring
+ * 3. Focuses on the specific bug without scope creep
  */
 
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  type DepthLevel,
-  getDepthConfig,
-  getDepthPromptContext,
-} from "../../core/depth";
 import { loadAndRenderPrompt } from "../../core/prompts";
 import {
   runMultiSessionAgent,
@@ -33,7 +27,6 @@ export interface BugFixOptions {
   projectDir: string;
   errorInput?: string;
   errorFile?: string;
-  depth: DepthLevel;
   model?: string;
   maxIterations?: number;
 }
@@ -46,12 +39,10 @@ You always verify your fixes work before declaring completion.
 When the fix is verified and working, you MUST say "Fix verified - bug is resolved" to indicate completion.`;
 
 /**
- * Get the appropriate prompt based on depth level
+ * Get the bug fix prompt
  */
-function getBugFixPrompt(errorInput: string, depth: DepthLevel): string {
-  const config = getDepthConfig(depth);
+function getBugFixPrompt(errorInput: string): string {
   const context = {
-    ...getDepthPromptContext(config),
     error_input: errorInput,
   };
 
@@ -62,55 +53,21 @@ function getBugFixPrompt(errorInput: string, depth: DepthLevel): string {
   }
 
   // Fallback to inline prompt
-  return getFallbackPrompt(errorInput, depth);
+  return getFallbackPrompt(errorInput);
 }
 
-function getFallbackPrompt(errorInput: string, depth: DepthLevel): string {
-  const depthInstructions = {
-    quick: `**QUICK MODE** - Trust the error, make a fast fix.
+function getFallbackPrompt(errorInput: string): string {
+  return `# Bug Fix
 
-1. Read ONLY the file(s) mentioned in the error
-2. Identify the exact line/function causing the issue
-3. Apply a minimal fix immediately
-4. Skip exploration - don't map the codebase
-5. Run a quick verification if a test is mentioned
-
-Do NOT:
-- Explore unrelated code
-- Refactor anything
-- Add extensive error handling
-- Write new tests (unless the bug is in a test)
-
-Just fix the bug and verify it works.`,
-
-    standard: `**STANDARD MODE** - Understand context, fix properly.
+## Instructions
 
 1. Read the files mentioned in the error
-2. Check 1-2 related files for context
+2. Check related files for context
 3. Understand WHY the bug exists
 4. Apply a fix that addresses the root cause
 5. Run related tests to verify
 
-Be thorough but focused. Fix the bug without scope creep.`,
-
-    thorough: `**THOROUGH MODE** - Comprehensive analysis.
-
-1. Analyze the full stack trace
-2. Map all code paths involved
-3. Check for similar patterns elsewhere
-4. Understand the broader context
-5. Apply a comprehensive fix
-6. Run full test suite
-7. Add a regression test if appropriate
-
-Take your time to ensure this bug is fully resolved.`,
-  };
-
-  return `# Bug Fix
-
-## Depth: ${depth}
-
-${depthInstructions[depth]}
+Be thorough but focused. Fix the bug without scope creep.
 
 ## Error Input
 
@@ -120,9 +77,7 @@ ${errorInput}
 
 ## Your Task
 
-Diagnose this error and fix it.
-
-${depth === "quick" ? "After diagnosis, immediately apply the fix. Don't wait for confirmation." : "Report your findings, then apply the fix and verify it works."}
+Diagnose this error and fix it. Report your findings, then apply the fix and verify it works.
 
 When the fix is verified, say "Fix verified - bug is resolved" to indicate completion.`;
 }
@@ -130,7 +85,7 @@ When the fix is verified, say "Fix verified - bug is resolved" to indicate compl
 /**
  * Continuation prompt for subsequent sessions
  */
-function getContinuationPrompt(errorInput: string, depth: DepthLevel): string {
+function getContinuationPrompt(errorInput: string): string {
   return `# Continue Bug Fix
 
 You are continuing work on fixing a bug. This is a fresh context window.
@@ -158,7 +113,6 @@ export async function runBugFix(options: BugFixOptions): Promise<void> {
     projectDir,
     errorInput,
     errorFile,
-    depth,
     model = "claude-sonnet-4-5",
     maxIterations,
   } = options;
@@ -173,11 +127,10 @@ export async function runBugFix(options: BugFixOptions): Promise<void> {
     console.error("Warning: No error input provided. Agent will look for obvious issues.");
   }
 
-  const depthConfig = getDepthConfig(depth);
   const resolvedProjectDir = resolve(projectDir);
 
   // Print header
-  printAgentHeader("Bug Fix Agent", resolvedProjectDir, model, depthConfig, maxIterations);
+  printAgentHeader("Bug Fix Agent", resolvedProjectDir, model, maxIterations);
 
   if (error) {
     const preview = error.length > 200 ? error.slice(0, 200) + "..." : error;
@@ -201,7 +154,6 @@ export async function runBugFix(options: BugFixOptions): Promise<void> {
     {
       projectDir: resolvedProjectDir,
       model,
-      depthConfig,
       agentType: "bugfix",
       systemPrompt: SYSTEM_PROMPT,
       maxIterations,
@@ -209,9 +161,9 @@ export async function runBugFix(options: BugFixOptions): Promise<void> {
     {
       getPrompt: (iteration) => {
         if (iteration === 1) {
-          return getBugFixPrompt(error, depth);
+          return getBugFixPrompt(error);
         }
-        return getContinuationPrompt(error, depth);
+        return getContinuationPrompt(error);
       },
       isComplete,
       onComplete: () => {

@@ -13,11 +13,6 @@
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 
-import {
-  type DepthLevel,
-  getDepthConfig,
-  getDepthPromptContext,
-} from "../../core/depth";
 import { loadAndRenderPrompt } from "../../core/prompts";
 import {
   runMultiSessionAgent,
@@ -31,7 +26,6 @@ export interface RefactorOptions {
   projectDir: string;
   target?: string;
   focus?: "performance" | "readability" | "patterns" | "all";
-  depth: DepthLevel;
   model?: string;
   maxIterations?: number;
 }
@@ -46,12 +40,9 @@ When refactoring is complete and all tests pass, you MUST say "Refactoring compl
 
 function getRefactorPrompt(
   target: string,
-  focus: string,
-  depth: DepthLevel
+  focus: string
 ): string {
-  const config = getDepthConfig(depth);
   const context = {
-    ...getDepthPromptContext(config),
     target: target || "Analyze the codebase and identify areas that would benefit from refactoring.",
     focus,
   };
@@ -70,38 +61,15 @@ function getRefactorPrompt(
     all: "Consider all aspects: performance, readability, and design patterns.",
   };
 
-  const depthInstructions = {
-    quick: `**QUICK MODE** - Targeted improvements.
+  return `# Code Refactoring
 
-1. Run existing tests to establish baseline
-2. Make focused improvements to the target area
-3. Verify tests still pass
-4. Skip exploration of unrelated code`,
-
-    standard: `**STANDARD MODE** - Thorough refactoring.
+## Instructions
 
 1. Run full test suite to establish baseline
 2. Analyze the target area and its dependencies
 3. Plan refactoring approach
 4. Make incremental changes, testing after each
-5. Ensure all tests pass before completion`,
-
-    thorough: `**THOROUGH MODE** - Comprehensive improvement.
-
-1. Full test suite verification
-2. Complete analysis of target area architecture
-3. Identify all improvement opportunities
-4. Create refactoring plan with priorities
-5. Implement changes incrementally with tests
-6. Code review quality verification
-7. Performance benchmarking if applicable`,
-  };
-
-  return `# Code Refactoring
-
-## Depth: ${depth}
-
-${depthInstructions[depth]}
+5. Ensure all tests pass before completion
 
 ## Focus Area
 
@@ -161,16 +129,14 @@ export async function runRefactor(options: RefactorOptions): Promise<void> {
     projectDir,
     target = "",
     focus = "all",
-    depth,
     model = "claude-sonnet-4-5",
     maxIterations,
   } = options;
 
-  const depthConfig = getDepthConfig(depth);
   const resolvedProjectDir = resolve(projectDir);
 
   // Print header
-  printAgentHeader("Refactor Agent", resolvedProjectDir, model, depthConfig, maxIterations);
+  printAgentHeader("Refactor Agent", resolvedProjectDir, model, maxIterations);
 
   console.log(`Focus: ${focus}`);
   if (target) {
@@ -194,7 +160,6 @@ export async function runRefactor(options: RefactorOptions): Promise<void> {
     {
       projectDir: resolvedProjectDir,
       model,
-      depthConfig,
       agentType: "refactor",
       systemPrompt: SYSTEM_PROMPT,
       maxIterations,
@@ -202,7 +167,7 @@ export async function runRefactor(options: RefactorOptions): Promise<void> {
     {
       getPrompt: (iteration) => {
         if (iteration === 1) {
-          return getRefactorPrompt(target, focus, depth);
+          return getRefactorPrompt(target, focus);
         }
         return getContinuationPrompt(target, focus);
       },

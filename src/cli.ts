@@ -25,7 +25,6 @@ import { runRefactor } from "./agents/refactor";
 import { runBuilder } from "./agents/builder";
 import { runMigrator } from "./agents/migrator";
 import { runScaffold } from "./agents/scaffold";
-import type { DepthLevel } from "./core/depth";
 import {
   hasExistingState,
   detectStateType,
@@ -57,9 +56,8 @@ program
   .requiredOption("-p, --project <path>", "Project directory to work in")
   .option("-e, --error <text>", "Error message or stack trace to fix")
   .option("-f, --error-file <path>", "Path to file containing error log")
-  .option("-d, --depth <level>", "How thorough: quick, standard, thorough", "standard")
   .option("-m, --model <name>", "Claude model to use", DEFAULT_MODEL)
-  .option("-i, --max-iterations <number>", "Max iterations (overrides depth preset)")
+  .option("-i, --max-iterations <number>", "Max iterations (default: unlimited)")
   .action(async (options) => {
     // Validate inputs
     if (!options.error && !options.errorFile) {
@@ -82,7 +80,6 @@ program
         projectDir: resolve(options.project),
         errorInput: options.error,
         errorFile: options.errorFile ? resolve(options.errorFile) : undefined,
-        depth: options.depth as DepthLevel,
         model: options.model,
         maxIterations: options.maxIterations ? parseInt(options.maxIterations, 10) : undefined,
       });
@@ -99,9 +96,8 @@ program
   .requiredOption("-p, --project <path>", "Project directory to work in")
   .option("-s, --spec <text>", "Feature specification text")
   .option("-f, --spec-file <path>", "Path to feature specification file")
-  .option("-d, --depth <level>", "How thorough: quick, standard, thorough", "standard")
   .option("-m, --model <name>", "Claude model to use", DEFAULT_MODEL)
-  .option("-i, --max-iterations <number>", "Max iterations (overrides depth preset)")
+  .option("-i, --max-iterations <number>", "Max iterations (default: unlimited)")
   .action(async (options) => {
     if (!options.spec && !options.specFile) {
       console.error("Error: Must provide either --spec or --spec-file");
@@ -123,7 +119,6 @@ program
         projectDir: resolve(options.project),
         specText: options.spec,
         specFile: options.specFile ? resolve(options.specFile) : undefined,
-        depth: options.depth as DepthLevel,
         model: options.model,
         maxIterations: options.maxIterations ? parseInt(options.maxIterations, 10) : undefined,
       });
@@ -140,9 +135,8 @@ program
   .requiredOption("-p, --project <path>", "Project directory to work in")
   .option("-t, --target <path>", "Target path/pattern to refactor (e.g., 'src/legacy/')")
   .option("--focus <area>", "Focus area: performance, readability, patterns, all", "all")
-  .option("-d, --depth <level>", "How thorough: quick, standard, thorough", "standard")
   .option("-m, --model <name>", "Claude model to use", DEFAULT_MODEL)
-  .option("-i, --max-iterations <number>", "Max iterations (overrides depth preset)")
+  .option("-i, --max-iterations <number>", "Max iterations (default: unlimited)")
   .action(async (options) => {
     if (!existsSync(options.project)) {
       console.error(`Error: Project directory not found: ${options.project}`);
@@ -154,7 +148,6 @@ program
         projectDir: resolve(options.project),
         target: options.target,
         focus: options.focus as "performance" | "readability" | "patterns" | "all",
-        depth: options.depth as DepthLevel,
         model: options.model,
         maxIterations: options.maxIterations ? parseInt(options.maxIterations, 10) : undefined,
       });
@@ -503,11 +496,14 @@ Examples:
   # Quick Tasks (minutes)
   # ----------------------
 
-  # Quick bug fix from error message
-  $ ai-agent bugfix -p ./my-app -e "TypeError: Cannot read property 'x' of undefined" -d quick
+  # Bug fix from error message
+  $ ai-agent bugfix -p ./my-app -e "TypeError: Cannot read property 'x' of undefined"
 
-  # Bug fix from error log file with standard depth
+  # Bug fix from error log file
   $ ai-agent bugfix -p ./my-app -f ./error.log
+
+  # Bug fix with limited iterations
+  $ ai-agent bugfix -p ./my-app -e "Error message" -i 5
 
   # Add a small feature
   $ ai-agent feature -p ./my-app -s "Add a dark mode toggle to settings"
@@ -538,10 +534,8 @@ Examples:
   $ ai-agent status -p ./my-app
 
 
-Depth Levels (for quick tasks):
-  quick     - Fast, minimal analysis. Trust user's diagnosis. Max iterations: 5
-  standard  - Balanced exploration and implementation. Max iterations: 20 (default)
-  thorough  - Comprehensive analysis, extensive testing. Max iterations: unlimited
+Options:
+  --max-iterations, -i  Limit the number of iterations (default: unlimited)
 
 Long-Running Tasks:
   'build'    - Build complete applications with browser testing and feature tracking

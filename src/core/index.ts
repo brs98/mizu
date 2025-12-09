@@ -4,22 +4,10 @@
  * Shared components for all specialized AI agents.
  */
 
-// Depth configuration (cost control)
-export {
-  type DepthLevel,
-  type DepthConfig,
-  type AnalysisScope,
-  type VerificationLevel,
-  DEPTH_PRESETS,
-  getDepthConfig,
-  getDepthPromptContext,
-} from "./depth";
-
 // Basic permissions (for quick agents)
 export {
   type AgentType,
   createPermissionCallback,
-  getPermissionMode,
 } from "./permissions";
 
 // Prompt utilities

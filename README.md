@@ -61,15 +61,15 @@ bun run src/cli.ts bugfix -p ./my-project -e "TypeError: Cannot read property 'x
 # From error log file
 bun run src/cli.ts bugfix -p ./my-project -f ./error.log
 
-# Quick mode (trust diagnosis, minimal exploration)
-bun run src/cli.ts bugfix -p ./my-project -e "error" -d quick
+# Limit iterations
+bun run src/cli.ts bugfix -p ./my-project -e "error" -i 5
 ```
 
 **Options:**
 - `-p, --project <path>` - Project directory (required)
 - `-e, --error <text>` - Error message or stack trace
 - `-f, --error-file <path>` - Path to error log file
-- `-d, --depth <level>` - quick, standard, thorough (default: standard)
+- `-i, --max-iterations <n>` - Maximum iterations (default: unlimited)
 - `-m, --model <name>` - Claude model (default: claude-sonnet-4-5)
 
 ### feature
@@ -88,7 +88,7 @@ bun run src/cli.ts feature -p ./my-project -f ./feature-spec.md
 - `-p, --project <path>` - Project directory (required)
 - `-s, --spec <text>` - Feature specification text
 - `-f, --spec-file <path>` - Path to specification file
-- `-d, --depth <level>` - quick, standard, thorough (default: standard)
+- `-i, --max-iterations <n>` - Maximum iterations (default: unlimited)
 - `-m, --model <name>` - Claude model (default: claude-sonnet-4-5)
 
 ### refactor
@@ -107,7 +107,7 @@ bun run src/cli.ts refactor -p ./my-project -t "src/utils/" --focus readability
 - `-p, --project <path>` - Project directory (required)
 - `-t, --target <path>` - Target path/pattern to refactor
 - `--focus <area>` - performance, readability, patterns, all (default: all)
-- `-d, --depth <level>` - quick, standard, thorough (default: standard)
+- `-i, --max-iterations <n>` - Maximum iterations (default: unlimited)
 - `-m, --model <name>` - Claude model (default: claude-sonnet-4-5)
 
 ## Long-Running Task Commands
@@ -216,21 +216,6 @@ bun run src/cli.ts status -p ./my-project
 bun run src/cli.ts status -p ./my-project --json
 ```
 
-## Depth Levels
-
-Control how thorough quick-task agents are:
-
-| Level | Behavior |
-|-------|----------|
-| `quick` | Fast, minimal analysis. Trust user's diagnosis. |
-| `standard` | Balanced exploration and implementation. **(default)** |
-| `thorough` | Comprehensive analysis, extensive testing. |
-
-```bash
-bun run src/cli.ts bugfix -p ./project -e "error" -d quick
-bun run src/cli.ts bugfix -p ./project -f ./error.log -d thorough
-```
-
 ## Project Structure
 
 ```
@@ -238,8 +223,8 @@ ai-agents/
 ├── src/
 │   ├── cli.ts                      # CLI entry point
 │   ├── core/
-│   │   ├── depth.ts                # Depth levels and budget configs
 │   │   ├── longrunning.ts          # Multi-session agent runner
+│   │   ├── session.ts              # Session management
 │   │   ├── state.ts                # Persistent state management
 │   │   ├── security.ts             # Command validation and security
 │   │   ├── sandbox.ts              # OS-level sandbox configuration
