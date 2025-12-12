@@ -86,6 +86,10 @@ export function buildToolPermissions(options: MCPConfigOptions): string[] {
   // Bash is always allowed (but validated by security hooks)
   permissions.push("Bash(*)");
 
+  // Task and TodoWrite are always allowed
+  permissions.push("Task(*)");
+  permissions.push("TodoWrite(*)");
+
   // Add Puppeteer tools if enabled
   if (options.enablePuppeteer) {
     for (const tool of PUPPETEER_TOOLS) {
@@ -141,18 +145,21 @@ export function generateSettings(options: GenerateSettingsOptions): ClaudeSettin
 }
 
 /**
- * Write settings to .claude_settings.json in the project directory
+ * Write settings to .claude/settings.local.json in the project directory.
+ * Uses settings.local.json so it can be gitignored and won't conflict with
+ * any existing project settings.
  */
 export function writeSettingsFile(
   projectDir: string,
   settings: ClaudeSettingsFile
 ): string {
-  // Ensure project directory exists
-  if (!existsSync(projectDir)) {
-    mkdirSync(projectDir, { recursive: true });
+  // Ensure .claude directory exists
+  const claudeDir = join(projectDir, ".claude");
+  if (!existsSync(claudeDir)) {
+    mkdirSync(claudeDir, { recursive: true });
   }
 
-  const settingsPath = join(projectDir, ".claude_settings.json");
+  const settingsPath = join(claudeDir, "settings.local.json");
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 
   return settingsPath;

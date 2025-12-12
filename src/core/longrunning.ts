@@ -14,6 +14,7 @@ import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { resolve } from "node:path";
 
 import type { ProjectState, BuilderState, MigratorState, ScaffoldState } from "./state";
+import type { AgentType } from "./permissions";
 import { createSecurePermissionCallback, bashSecurityHook } from "./security";
 import { createSettingsFile, printSecuritySummary, generateSettings } from "./sandbox";
 import { buildMCPServersConfig, BUILTIN_TOOLS, PUPPETEER_TOOLS } from "./mcp";
@@ -25,7 +26,7 @@ import { buildMCPServersConfig, BUILTIN_TOOLS, PUPPETEER_TOOLS } from "./mcp";
 export interface LongRunningConfig {
   projectDir: string;
   model: string;
-  agentType: "builder" | "migrator" | "scaffold";
+  agentType: AgentType;
   systemPrompt: string;
   maxSessions?: number;
   enablePuppeteer?: boolean;
@@ -71,13 +72,12 @@ interface ClientConfig {
   projectDir: string;
   model: string;
   systemPrompt: string;
-  settingsPath: string;
   enablePuppeteer: boolean;
-  agentType: "builder" | "migrator" | "scaffold";
+  agentType: AgentType;
 }
 
 function createQueryOptions(config: ClientConfig) {
-  const { projectDir, model, systemPrompt, settingsPath, enablePuppeteer, agentType } = config;
+  const { projectDir, model, systemPrompt, enablePuppeteer, agentType } = config;
 
   // Build allowed tools list
   const allowedTools: string[] = [...BUILTIN_TOOLS];
@@ -99,6 +99,8 @@ function createQueryOptions(config: ClientConfig) {
     allowedTools,
     mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
     maxTurns: MAX_TURNS_PER_SESSION,
+    // Load settings from .claude/settings.local.json
+    settingSources: ["local" as const],
   };
 }
 
@@ -154,8 +156,10 @@ async function runSession(
           if (message.event.type === "content_block_start") {
             const block = message.event.content_block;
             if (block.type === "tool_use") {
-              console.log(`\n[Tool: ${block.name}]`);
+              console.log(`\n\n[Tool: ${block.name}]`);
             }
+          } else if (message.event.type === "content_block_stop") {
+            console.log("\n");
           }
           break;
 
@@ -172,7 +176,7 @@ async function runSession(
       }
     }
 
-    console.log("\n");
+    console.log("\n" + "-".repeat(40) + "\n");
     return { status: "continue", response: responseText, sessionId };
   } catch (err) {
     const error = err as Error;
@@ -230,7 +234,6 @@ export async function runLongRunningAgent(
     projectDir: resolvedProjectDir,
     model,
     systemPrompt,
-    settingsPath,
     enablePuppeteer,
     agentType,
   });
@@ -311,7 +314,7 @@ export interface LongRunningHeaderOptions {
   agentName: string;
   projectDir: string;
   model: string;
-  stateType: "builder" | "migrator" | "scaffold";
+  stateType: AgentType;
   initialized: boolean;
   sessionCount: number;
   maxSessions?: number;

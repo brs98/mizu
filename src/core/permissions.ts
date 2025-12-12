@@ -7,7 +7,7 @@
 
 import type { PermissionResult, CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 
-export type AgentType = "bugfix" | "feature" | "refactor" | "greenfield";
+export type AgentType = "bugfix" | "feature" | "refactor" | "greenfield" | "builder" | "migrator" | "scaffold";
 
 // Base allowed commands (safe for all agents)
 const BASE_ALLOWED_COMMANDS = new Set([
@@ -61,11 +61,8 @@ const ALLOWED_KILL_TARGETS = new Set([
 function getAllowedCommands(agentType: AgentType): Set<string> {
   const commands = new Set(BASE_ALLOWED_COMMANDS);
 
-  if (["bugfix", "feature", "refactor"].includes(agentType)) {
-    DEV_COMMANDS.forEach(cmd => commands.add(cmd));
-  } else if (agentType === "greenfield") {
-    DEV_COMMANDS.forEach(cmd => commands.add(cmd));
-  }
+  // All agent types get dev commands
+  DEV_COMMANDS.forEach(cmd => commands.add(cmd));
 
   return commands;
 }

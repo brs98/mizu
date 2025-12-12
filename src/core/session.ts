@@ -11,7 +11,9 @@
  */
 
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { type AgentType, createPermissionCallback } from "./permissions";
+import { type AgentType } from "./permissions";
+import { createSecurePermissionCallback } from "./security";
+import { createSettingsFile, generateSettings, printSecuritySummary } from "./sandbox";
 
 export interface SessionConfig {
   projectDir: string;
@@ -67,6 +69,22 @@ export async function runMultiSessionAgent(
 
   const { getPrompt, onSessionStart, onSessionEnd, isComplete, onComplete } = callbacks;
 
+  // Create settings file for permissions
+  const settings = generateSettings({
+    projectDir,
+    sandboxEnabled: true,
+    permissionMode: "acceptEdits",
+    enablePuppeteer: false,
+  });
+  const settingsPath = createSettingsFile({
+    projectDir,
+    sandboxEnabled: true,
+    permissionMode: "acceptEdits",
+    enablePuppeteer: false,
+  });
+
+  printSecuritySummary(settingsPath, settings, projectDir);
+
   let iteration = 0;
   let sessionId: string | undefined;
   let completed = false;
@@ -98,7 +116,10 @@ export async function runMultiSessionAgent(
           model,
           cwd: projectDir,
           systemPrompt,
-          canUseTool: createPermissionCallback(agentType),
+          permissionMode: "acceptEdits" as const,
+          canUseTool: createSecurePermissionCallback(agentType),
+          // Load settings from .claude/settings.local.json
+          settingSources: ["local" as const],
           // Resume previous session if we have one
           ...(sessionId ? { resume: sessionId } : {}),
         },
@@ -133,10 +154,10 @@ export async function runMultiSessionAgent(
             if (message.event.type === "content_block_start") {
               const block = message.event.content_block;
               if (block.type === "tool_use") {
-                console.log(`\n[Tool: ${block.name}]`);
+                console.log(`\n\n[Tool: ${block.name}]`);
               }
             } else if (message.event.type === "content_block_stop") {
-              // Tool use completed
+              console.log("\n");
             }
             break;
 
@@ -153,7 +174,7 @@ export async function runMultiSessionAgent(
         }
       }
 
-      console.log("\n");
+      console.log("\n" + "-".repeat(40) + "\n");
 
       // Notify session end
       onSessionEnd?.(iteration, responseText);
