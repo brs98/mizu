@@ -10,13 +10,22 @@
  * - Handles the two-agent pattern (initializer + coder)
  */
 
-import { query, type SDKMessage, type SettingSource } from "@anthropic-ai/claude-agent-sdk";
+import { query, type SettingSource } from "@anthropic-ai/claude-agent-sdk";
 import { resolve } from "node:path";
 
-import type { ProjectState, BuilderState, MigratorState, ScaffoldState } from "./state";
+import type {
+  ProjectState,
+  BuilderState,
+  MigratorState,
+  ScaffoldState,
+} from "./state";
 import type { AgentType } from "./permissions";
-import { createSecurePermissionCallback, bashSecurityHook } from "./security";
-import { createSettingsFile, printSecuritySummary, generateSettings } from "./sandbox";
+import { createSecurePermissionCallback } from "./security";
+import {
+  createSettingsFile,
+  printSecuritySummary,
+  generateSettings,
+} from "./sandbox";
 import { buildMCPServersConfig, BUILTIN_TOOLS, PUPPETEER_TOOLS } from "./mcp";
 
 // =============================================================================
@@ -77,7 +86,8 @@ interface ClientConfig {
 }
 
 function createQueryOptions(config: ClientConfig) {
-  const { projectDir, model, systemPrompt, enablePuppeteer, agentType } = config;
+  const { projectDir, model, systemPrompt, enablePuppeteer, agentType } =
+    config;
 
   // Build allowed tools list
   const allowedTools: string[] = [...BUILTIN_TOOLS];
@@ -99,7 +109,7 @@ function createQueryOptions(config: ClientConfig) {
     allowedTools,
     mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
     maxTurns: MAX_TURNS_PER_SESSION,
-    settingSources: ["project"] as SettingSource[],
+    settingSources: ["project", "local"] as SettingSource[],
   };
 }
 
@@ -116,7 +126,7 @@ interface SessionResult {
 async function runSession(
   prompt: string,
   options: ReturnType<typeof createQueryOptions>,
-  previousSessionId?: string
+  previousSessionId?: string,
 ): Promise<SessionResult> {
   let responseText = "";
   let sessionId: string | undefined;
@@ -189,7 +199,7 @@ async function runSession(
 // =============================================================================
 
 export async function runLongRunningAgent(
-  config: LongRunningConfig
+  config: LongRunningConfig,
 ): Promise<LongRunningResult> {
   const {
     projectDir,
@@ -251,7 +261,7 @@ export async function runLongRunningAgent(
     onSessionStart?.(sessionNumber);
 
     console.log(
-      `\n${"=".repeat(70)}\n  SESSION ${sessionNumber}${maxSessions === Infinity ? "" : ` / ${maxSessions}`}\n${"=".repeat(70)}\n`
+      `\n${"=".repeat(70)}\n  SESSION ${sessionNumber}${maxSessions === Infinity ? "" : ` / ${maxSessions}`}\n${"=".repeat(70)}\n`,
     );
 
     // Get prompt for this session
@@ -266,7 +276,9 @@ export async function runLongRunningAgent(
 
     // Handle result
     if (result.status === "error") {
-      console.log(`\nSession error. Retrying in ${ERROR_RETRY_DELAY_MS / 1000}s...`);
+      console.log(
+        `\nSession error. Retrying in ${ERROR_RETRY_DELAY_MS / 1000}s...`,
+      );
       await sleep(ERROR_RETRY_DELAY_MS);
       sessionNumber--; // Retry this session
       continue;
@@ -295,7 +307,9 @@ export async function runLongRunningAgent(
 
   if (!completed && sessionNumber >= maxSessions) {
     console.log(`\nReached max sessions (${maxSessions})`);
-    console.log("To continue, run again with --max-sessions or use 'ai-agent resume'\n");
+    console.log(
+      "To continue, run again with --max-sessions or use 'ai-agent resume'\n",
+    );
   }
 
   return {
@@ -319,9 +333,18 @@ export interface LongRunningHeaderOptions {
   maxSessions?: number;
 }
 
-export function printLongRunningHeader(options: LongRunningHeaderOptions): void {
-  const { agentName, projectDir, model, stateType, initialized, sessionCount, maxSessions } =
-    options;
+export function printLongRunningHeader(
+  options: LongRunningHeaderOptions,
+): void {
+  const {
+    agentName,
+    projectDir,
+    model,
+    stateType,
+    initialized,
+    sessionCount,
+    maxSessions,
+  } = options;
 
   console.log("\n" + "=".repeat(70));
   console.log(`  ${agentName.toUpperCase()}`);
@@ -331,7 +354,9 @@ export function printLongRunningHeader(options: LongRunningHeaderOptions): void 
   console.log(`Type: ${stateType}`);
   console.log(`Status: ${initialized ? "Continuing" : "Fresh start"}`);
   console.log(`Sessions completed: ${sessionCount}`);
-  console.log(`Max sessions: ${maxSessions === Infinity ? "Unlimited" : maxSessions}`);
+  console.log(
+    `Max sessions: ${maxSessions === Infinity ? "Unlimited" : maxSessions}`,
+  );
   console.log();
 }
 
@@ -342,7 +367,9 @@ export interface LongRunningCompletionOptions {
   state: ProjectState;
 }
 
-export function printLongRunningCompletion(options: LongRunningCompletionOptions): void {
+export function printLongRunningCompletion(
+  options: LongRunningCompletionOptions,
+): void {
   const { agentName, completed, sessions, state } = options;
 
   console.log("\n" + "=".repeat(70));
@@ -360,12 +387,16 @@ export function printLongRunningCompletion(options: LongRunningCompletionOptions
   } else if (state.type === "migrator") {
     const migratorState = state as MigratorState;
     const total = migratorState.files.length;
-    const migrated = migratorState.files.filter((f) => f.status === "migrated").length;
+    const migrated = migratorState.files.filter(
+      (f) => f.status === "migrated",
+    ).length;
     console.log(`Files: ${migrated}/${total} migrated`);
   } else if (state.type === "scaffold") {
     const scaffoldState = state as ScaffoldState;
     const total = scaffoldState.tasks.length;
-    const completed = scaffoldState.tasks.filter((t) => t.status === "completed").length;
+    const completed = scaffoldState.tasks.filter(
+      (t) => t.status === "completed",
+    ).length;
     console.log(`Tasks: ${completed}/${total} completed`);
   }
 
@@ -377,7 +408,9 @@ export function printLongRunningCompletion(options: LongRunningCompletionOptions
     console.log("  TO CONTINUE:");
     console.log("-".repeat(70));
     console.log(`\n  ai-agent resume -p ${state.projectDir}`);
-    console.log("\n  Or run the same command again to pick up where you left off.");
+    console.log(
+      "\n  Or run the same command again to pick up where you left off.",
+    );
     console.log("-".repeat(70));
   }
 }
