@@ -10,7 +10,7 @@
  * - Handles the two-agent pattern (initializer + coder)
  */
 
-import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { query, type SDKMessage, type SettingSource } from "@anthropic-ai/claude-agent-sdk";
 import { resolve } from "node:path";
 
 import type { ProjectState, BuilderState, MigratorState, ScaffoldState } from "./state";
@@ -99,8 +99,7 @@ function createQueryOptions(config: ClientConfig) {
     allowedTools,
     mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
     maxTurns: MAX_TURNS_PER_SESSION,
-    // Load settings from .claude/settings.local.json
-    settingSources: ["local" as const],
+    settingSources: ["project"] as SettingSource[],
   };
 }
 

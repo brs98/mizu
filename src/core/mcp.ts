@@ -10,8 +10,9 @@
 // =============================================================================
 
 export interface MCPServerConfig {
+  type?: "stdio";
   command: string;
-  args: string[];
+  args?: string[];
   env?: Record<string, string>;
 }
 
