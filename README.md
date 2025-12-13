@@ -4,21 +4,20 @@ Specialized AI agents for software engineering tasks, powered by the [Claude Age
 
 ## Agents
 
-### Quick Tasks (Single Session)
+All agents use a **two-phase pattern** with task-based state tracking:
+- **Session 1 (Initializer):** Analyzes inputs, creates a task list
+- **Sessions 2+ (Worker):** Executes one task per session until complete
 
-| Agent | Description |
-|-------|-------------|
-| **bugfix** | Diagnose and fix bugs from error logs and stack traces |
-| **feature** | Add new functionality to existing codebases |
-| **refactor** | Improve code quality without changing behavior |
+This enables crash recovery, incremental progress, and verification at each step.
 
-### Long-Running Tasks (Multi-Session)
-
-| Agent | Description |
-|-------|-------------|
-| **build** | Build complete applications from specifications with browser testing |
-| **migrate** | Migrate schemas across codebases (e.g., Zod to OpenAPI) |
-| **scaffold** | Scaffold new packages/projects from PRDs with reference support |
+| Agent | Description | Task File |
+|-------|-------------|-----------|
+| **bugfix** | Diagnose and fix bugs from error logs and stack traces | `bugfix_tasks.json` |
+| **feature** | Add new functionality to existing codebases | `feature_tasks.json` |
+| **refactor** | Improve code quality without changing behavior | `refactor_tasks.json` |
+| **build** | Build complete applications from specifications with browser testing | `feature_list.json` |
+| **migrate** | Migrate schemas across codebases (e.g., Zod to OpenAPI) | `migration_manifest.json` |
+| **scaffold** | Scaffold new packages/projects from PRDs with reference support | `scaffold_tasks.json` |
 
 ## Installation
 
@@ -33,26 +32,34 @@ Requires:
 ## Quick Start
 
 ```bash
-# Quick Tasks
+# Bug fixing
 bun run src/cli.ts bugfix -p ./my-project -e "TypeError: Cannot read property 'x' of undefined"
+
+# Feature implementation
 bun run src/cli.ts feature -p ./my-project -s "Add dark mode toggle"
+
+# Refactoring
 bun run src/cli.ts refactor -p ./my-project -t "src/api/" --focus performance
 
-# Long-Running Tasks
+# Build complete application
 bun run src/cli.ts build -p ./new-app -f ./app-spec.md
+
+# Schema migration
 bun run src/cli.ts migrate -p ./migration -s src/schemas --swagger ./swagger.json
+
+# Project scaffolding
 bun run src/cli.ts scaffold -p ./packages/new-client -f ./prd.md -r ./packages/existing-client
 
-# Resume or check status of long-running tasks
+# Resume or check status of any agent
 bun run src/cli.ts resume -p ./my-project
 bun run src/cli.ts status -p ./my-project
 ```
 
-## Quick Task Commands
+## Commands
 
 ### bugfix
 
-Diagnose and fix bugs from error logs.
+Diagnose and fix bugs from error logs. Uses TDD approach: reproduce bug → write failing test → implement fix → verify.
 
 ```bash
 # From error message
@@ -61,20 +68,24 @@ bun run src/cli.ts bugfix -p ./my-project -e "TypeError: Cannot read property 'x
 # From error log file
 bun run src/cli.ts bugfix -p ./my-project -f ./error.log
 
-# Limit iterations
-bun run src/cli.ts bugfix -p ./my-project -e "error" -i 5
+# Limit sessions
+bun run src/cli.ts bugfix -p ./my-project -e "error" --max-sessions 5
 ```
+
+**How it works:**
+1. **Session 1:** Analyzes error, creates `bugfix_tasks.json` with diagnostic and fix steps
+2. **Sessions 2+:** Executes one task per session (reproduce, identify cause, write test, fix, verify)
 
 **Options:**
 - `-p, --project <path>` - Project directory (required)
 - `-e, --error <text>` - Error message or stack trace
 - `-f, --error-file <path>` - Path to error log file
-- `-i, --max-iterations <n>` - Maximum iterations (default: unlimited)
+- `--max-sessions <n>` - Maximum sessions (default: unlimited)
 - `-m, --model <name>` - Claude model (default: claude-sonnet-4-5)
 
 ### feature
 
-Add new functionality to existing codebases.
+Add new functionality to existing codebases. Uses TDD approach: write tests first → implement → verify.
 
 ```bash
 # From description
@@ -84,11 +95,15 @@ bun run src/cli.ts feature -p ./my-project -s "Add user authentication with JWT"
 bun run src/cli.ts feature -p ./my-project -f ./feature-spec.md
 ```
 
+**How it works:**
+1. **Session 1:** Analyzes spec and codebase, creates `feature_tasks.json` with implementation steps
+2. **Sessions 2+:** Executes one task per session (analyze, design, implement, test, integrate)
+
 **Options:**
 - `-p, --project <path>` - Project directory (required)
 - `-s, --spec <text>` - Feature specification text
 - `-f, --spec-file <path>` - Path to specification file
-- `-i, --max-iterations <n>` - Maximum iterations (default: unlimited)
+- `--max-sessions <n>` - Maximum sessions (default: unlimited)
 - `-m, --model <name>` - Claude model (default: claude-sonnet-4-5)
 
 ### refactor
@@ -103,16 +118,16 @@ bun run src/cli.ts refactor -p ./my-project -t "src/api/" --focus performance
 bun run src/cli.ts refactor -p ./my-project -t "src/utils/" --focus readability
 ```
 
+**How it works:**
+1. **Session 1:** Analyzes target code, creates `refactor_tasks.json` with improvement tasks
+2. **Sessions 2+:** Executes one refactoring task per session, verifying behavior is preserved
+
 **Options:**
 - `-p, --project <path>` - Project directory (required)
 - `-t, --target <path>` - Target path/pattern to refactor
 - `--focus <area>` - performance, readability, patterns, all (default: all)
-- `-i, --max-iterations <n>` - Maximum iterations (default: unlimited)
+- `--max-sessions <n>` - Maximum sessions (default: unlimited)
 - `-m, --model <name>` - Claude model (default: claude-sonnet-4-5)
-
-## Long-Running Task Commands
-
-Long-running tasks span multiple sessions, with persistent state for crash recovery.
 
 ### build
 
@@ -198,7 +213,7 @@ bun run src/cli.ts scaffold -p ./my-package -f ./spec.md --verify "pnpm typechec
 
 ### resume
 
-Resume a long-running task from saved state.
+Resume any agent from saved state.
 
 ```bash
 bun run src/cli.ts resume -p ./my-project
@@ -206,7 +221,7 @@ bun run src/cli.ts resume -p ./my-project
 
 ### status
 
-Check progress of a long-running task.
+Check progress of any agent task.
 
 ```bash
 # Human-readable output
@@ -224,7 +239,6 @@ ai-agents/
 │   ├── cli.ts                      # CLI entry point
 │   ├── core/
 │   │   ├── longrunning.ts          # Multi-session agent runner
-│   │   ├── session.ts              # Session management
 │   │   ├── state.ts                # Persistent state management
 │   │   ├── security.ts             # Command validation and security
 │   │   ├── sandbox.ts              # OS-level sandbox configuration
@@ -232,27 +246,30 @@ ai-agents/
 │   │   ├── permissions.ts          # Tool permission controls
 │   │   └── prompts.ts              # Prompt template loading
 │   └── agents/
-│       ├── bugfix/                 # Quick: Bug diagnosis and fixing
-│       ├── feature/                # Quick: Feature implementation
-│       ├── refactor/               # Quick: Code quality improvement
-│       ├── builder/                # Long-running: App building
-│       ├── migrator/               # Long-running: Schema migration
-│       └── scaffold/               # Long-running: Package scaffolding
+│       ├── bugfix/                 # Bug diagnosis and fixing
+│       ├── feature/                # Feature implementation
+│       ├── refactor/               # Code quality improvement
+│       ├── builder/                # Complete app building
+│       ├── migrator/               # Schema migration
+│       └── scaffold/               # Package scaffolding
 ├── package.json
 └── tsconfig.json
 ```
 
 ## State Files
 
-Long-running agents create state files for crash recovery:
+All agents create state files in the project directory for crash recovery:
 
-| File | Purpose |
-|------|---------|
-| `.ai-agent-state.json` | Core state (type, session count, status) |
-| `feature_list.json` | Builder: test cases with pass/fail status |
-| `migration_manifest.json` | Migrator: files with migration status |
-| `scaffold_tasks.json` | Scaffold: tasks with completion status |
-| `claude-progress.txt` | Human-readable session notes |
+| File | Agent | Purpose |
+|------|-------|---------|
+| `.ai-agent-state.json` | All | Core state (type, session count, status) |
+| `bugfix_tasks.json` | bugfix | Diagnostic and fix tasks |
+| `feature_tasks.json` | feature | Feature implementation tasks |
+| `refactor_tasks.json` | refactor | Refactoring improvement tasks |
+| `feature_list.json` | build | Test cases with pass/fail status |
+| `migration_manifest.json` | migrate | Files with migration status and dependencies |
+| `scaffold_tasks.json` | scaffold | Scaffolding tasks with completion status |
+| `claude-progress.txt` | All | Human-readable session notes |
 
 ## Customizing Prompts
 
