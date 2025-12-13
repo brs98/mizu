@@ -18,8 +18,10 @@ import { join, dirname } from "node:path";
 // Core Types
 // =============================================================================
 
-export type AgentMode = "quick" | "long-running";
-export type LongRunningAgentType = "builder" | "migrator" | "scaffold";
+export type AgentType = "builder" | "migrator" | "scaffold" | "bugfix" | "feature" | "refactor";
+
+// Backwards compatibility alias
+export type LongRunningAgentType = AgentType;
 
 export interface BaseState {
   version: string;
@@ -119,10 +121,61 @@ export interface ScaffoldState extends BaseState {
 }
 
 // =============================================================================
+// Bugfix State
+// =============================================================================
+
+// Reuse ScaffoldTask as the generic task type - it's well-designed for all agents
+export type AgentTask = ScaffoldTask;
+export type AgentTaskStatus = ScaffoldTaskStatus;
+
+export interface BugfixState extends BaseState {
+  type: "bugfix";
+  errorInput?: string;
+  errorFile?: string;
+  tasks: AgentTask[];
+  completedTasks: number;
+  totalTasks: number;
+}
+
+// =============================================================================
+// Feature State
+// =============================================================================
+
+export interface FeatureState extends BaseState {
+  type: "feature";
+  specFile?: string;
+  specText?: string;
+  tasks: AgentTask[];
+  completedTasks: number;
+  totalTasks: number;
+}
+
+// =============================================================================
+// Refactor State
+// =============================================================================
+
+export type RefactorFocus = "performance" | "readability" | "patterns" | "all";
+
+export interface RefactorState extends BaseState {
+  type: "refactor";
+  target?: string;
+  focus?: RefactorFocus;
+  tasks: AgentTask[];
+  completedTasks: number;
+  totalTasks: number;
+}
+
+// =============================================================================
 // Union Type
 // =============================================================================
 
-export type ProjectState = BuilderState | MigratorState | ScaffoldState;
+export type ProjectState =
+  | BuilderState
+  | MigratorState
+  | ScaffoldState
+  | BugfixState
+  | FeatureState
+  | RefactorState;
 
 // =============================================================================
 // File Paths
@@ -132,6 +185,9 @@ const STATE_FILE = ".ai-agent-state.json";
 const FEATURE_LIST_FILE = "feature_list.json";
 const MIGRATION_MANIFEST_FILE = "migration_manifest.json";
 const SCAFFOLD_TASKS_FILE = "scaffold_tasks.json";
+const BUGFIX_TASKS_FILE = "bugfix_tasks.json";
+const FEATURE_TASKS_FILE = "feature_tasks.json";
+const REFACTOR_TASKS_FILE = "refactor_tasks.json";
 const PROGRESS_FILE = "claude-progress.txt";
 
 export function getStateFilePath(projectDir: string): string {
@@ -148,6 +204,18 @@ export function getMigrationManifestPath(projectDir: string): string {
 
 export function getScaffoldTasksPath(projectDir: string): string {
   return join(projectDir, SCAFFOLD_TASKS_FILE);
+}
+
+export function getBugfixTasksPath(projectDir: string): string {
+  return join(projectDir, BUGFIX_TASKS_FILE);
+}
+
+export function getFeatureTasksPath(projectDir: string): string {
+  return join(projectDir, FEATURE_TASKS_FILE);
+}
+
+export function getRefactorTasksPath(projectDir: string): string {
+  return join(projectDir, REFACTOR_TASKS_FILE);
 }
 
 export function getProgressFilePath(projectDir: string): string {
@@ -231,6 +299,30 @@ export function loadScaffoldState(projectDir: string): ScaffoldState | null {
   const state = loadState(projectDir);
   if (state?.type === "scaffold") {
     return state;
+  }
+  return null;
+}
+
+export function loadBugfixState(projectDir: string): BugfixState | null {
+  const state = loadState(projectDir);
+  if (state?.type === "bugfix") {
+    return state as BugfixState;
+  }
+  return null;
+}
+
+export function loadFeatureState(projectDir: string): FeatureState | null {
+  const state = loadState(projectDir);
+  if (state?.type === "feature") {
+    return state as FeatureState;
+  }
+  return null;
+}
+
+export function loadRefactorState(projectDir: string): RefactorState | null {
+  const state = loadState(projectDir);
+  if (state?.type === "refactor") {
+    return state as RefactorState;
   }
   return null;
 }
@@ -325,6 +417,84 @@ export function createScaffoldState(options: CreateScaffoldStateOptions): Scaffo
   };
 }
 
+export interface CreateBugfixStateOptions {
+  projectDir: string;
+  model: string;
+  errorInput?: string;
+  errorFile?: string;
+}
+
+export function createBugfixState(options: CreateBugfixStateOptions): BugfixState {
+  const now = new Date().toISOString();
+  return {
+    version: "1.0.0",
+    type: "bugfix",
+    initialized: false,
+    sessionCount: 0,
+    createdAt: now,
+    updatedAt: now,
+    model: options.model,
+    projectDir: options.projectDir,
+    errorInput: options.errorInput,
+    errorFile: options.errorFile,
+    tasks: [],
+    completedTasks: 0,
+    totalTasks: 0,
+  };
+}
+
+export interface CreateFeatureStateOptions {
+  projectDir: string;
+  model: string;
+  specFile?: string;
+  specText?: string;
+}
+
+export function createFeatureState(options: CreateFeatureStateOptions): FeatureState {
+  const now = new Date().toISOString();
+  return {
+    version: "1.0.0",
+    type: "feature",
+    initialized: false,
+    sessionCount: 0,
+    createdAt: now,
+    updatedAt: now,
+    model: options.model,
+    projectDir: options.projectDir,
+    specFile: options.specFile,
+    specText: options.specText,
+    tasks: [],
+    completedTasks: 0,
+    totalTasks: 0,
+  };
+}
+
+export interface CreateRefactorStateOptions {
+  projectDir: string;
+  model: string;
+  target?: string;
+  focus?: RefactorFocus;
+}
+
+export function createRefactorState(options: CreateRefactorStateOptions): RefactorState {
+  const now = new Date().toISOString();
+  return {
+    version: "1.0.0",
+    type: "refactor",
+    initialized: false,
+    sessionCount: 0,
+    createdAt: now,
+    updatedAt: now,
+    model: options.model,
+    projectDir: options.projectDir,
+    target: options.target,
+    focus: options.focus,
+    tasks: [],
+    completedTasks: 0,
+    totalTasks: 0,
+  };
+}
+
 // =============================================================================
 // State Saving
 // =============================================================================
@@ -349,6 +519,9 @@ export function saveState(state: ProjectState): void {
     state.totalFiles = state.files.length;
     state.completedFiles = state.files.filter((f) => f.status === "migrated").length;
   } else if (state.type === "scaffold") {
+    state.totalTasks = state.tasks.length;
+    state.completedTasks = state.tasks.filter((t) => t.status === "completed").length;
+  } else if (state.type === "bugfix" || state.type === "feature" || state.type === "refactor") {
     state.totalTasks = state.tasks.length;
     state.completedTasks = state.tasks.filter((t) => t.status === "completed").length;
   }
@@ -542,6 +715,144 @@ export function getScaffoldProgress(tasks: ScaffoldTask[]): {
 }
 
 // =============================================================================
+// Bugfix Tasks Management
+// =============================================================================
+
+export function loadBugfixTasks(projectDir: string): AgentTask[] {
+  const tasksPath = getBugfixTasksPath(projectDir);
+  if (!existsSync(tasksPath)) {
+    return [];
+  }
+
+  try {
+    const content = readFileSync(tasksPath, "utf-8");
+    return JSON.parse(content) as AgentTask[];
+  } catch (error) {
+    console.error(`Failed to load bugfix tasks from ${tasksPath}:`, error);
+    return [];
+  }
+}
+
+export function saveBugfixTasks(projectDir: string, tasks: AgentTask[]): void {
+  const tasksPath = getBugfixTasksPath(projectDir);
+  writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
+}
+
+export function syncBugfixTasksFromFile(state: BugfixState): BugfixState {
+  const tasks = loadBugfixTasks(state.projectDir);
+  return {
+    ...state,
+    tasks,
+    totalTasks: tasks.length,
+    completedTasks: tasks.filter((t) => t.status === "completed").length,
+  };
+}
+
+export function getBugfixProgress(tasks: AgentTask[]): {
+  total: number;
+  completed: number;
+  pending: number;
+  inProgress: number;
+  blocked: number;
+  skipped: number;
+  percentage: number;
+} {
+  return getScaffoldProgress(tasks); // Reuse scaffold progress since task structure is identical
+}
+
+// =============================================================================
+// Feature Tasks Management
+// =============================================================================
+
+export function loadFeatureTasks(projectDir: string): AgentTask[] {
+  const tasksPath = getFeatureTasksPath(projectDir);
+  if (!existsSync(tasksPath)) {
+    return [];
+  }
+
+  try {
+    const content = readFileSync(tasksPath, "utf-8");
+    return JSON.parse(content) as AgentTask[];
+  } catch (error) {
+    console.error(`Failed to load feature tasks from ${tasksPath}:`, error);
+    return [];
+  }
+}
+
+export function saveFeatureTasks(projectDir: string, tasks: AgentTask[]): void {
+  const tasksPath = getFeatureTasksPath(projectDir);
+  writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
+}
+
+export function syncFeatureTasksFromFile(state: FeatureState): FeatureState {
+  const tasks = loadFeatureTasks(state.projectDir);
+  return {
+    ...state,
+    tasks,
+    totalTasks: tasks.length,
+    completedTasks: tasks.filter((t) => t.status === "completed").length,
+  };
+}
+
+export function getFeatureTaskProgress(tasks: AgentTask[]): {
+  total: number;
+  completed: number;
+  pending: number;
+  inProgress: number;
+  blocked: number;
+  skipped: number;
+  percentage: number;
+} {
+  return getScaffoldProgress(tasks); // Reuse scaffold progress since task structure is identical
+}
+
+// =============================================================================
+// Refactor Tasks Management
+// =============================================================================
+
+export function loadRefactorTasks(projectDir: string): AgentTask[] {
+  const tasksPath = getRefactorTasksPath(projectDir);
+  if (!existsSync(tasksPath)) {
+    return [];
+  }
+
+  try {
+    const content = readFileSync(tasksPath, "utf-8");
+    return JSON.parse(content) as AgentTask[];
+  } catch (error) {
+    console.error(`Failed to load refactor tasks from ${tasksPath}:`, error);
+    return [];
+  }
+}
+
+export function saveRefactorTasks(projectDir: string, tasks: AgentTask[]): void {
+  const tasksPath = getRefactorTasksPath(projectDir);
+  writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
+}
+
+export function syncRefactorTasksFromFile(state: RefactorState): RefactorState {
+  const tasks = loadRefactorTasks(state.projectDir);
+  return {
+    ...state,
+    tasks,
+    totalTasks: tasks.length,
+    completedTasks: tasks.filter((t) => t.status === "completed").length,
+  };
+}
+
+export function getRefactorProgress(tasks: AgentTask[]): {
+  total: number;
+  completed: number;
+  pending: number;
+  inProgress: number;
+  blocked: number;
+  skipped: number;
+  percentage: number;
+} {
+  return getScaffoldProgress(tasks); // Reuse scaffold progress since task structure is identical
+}
+
+// =============================================================================
 // Progress File Management
 // =============================================================================
 
@@ -656,6 +967,75 @@ export function printScaffoldProgress(state: ScaffoldState): void {
   console.log("-".repeat(50) + "\n");
 }
 
+export function printBugfixProgress(state: BugfixState): void {
+  const progress = getBugfixProgress(state.tasks);
+
+  console.log("\n" + "-".repeat(50));
+  console.log("  BUGFIX PROGRESS");
+  console.log("-".repeat(50));
+  console.log(`  Sessions completed: ${state.sessionCount}`);
+  console.log(`  Tasks: ${progress.completed}/${progress.total} completed (${progress.percentage}%)`);
+  if (progress.inProgress > 0) console.log(`  In progress: ${progress.inProgress}`);
+  if (progress.blocked > 0) console.log(`  Blocked: ${progress.blocked}`);
+  if (progress.skipped > 0) console.log(`  Skipped: ${progress.skipped}`);
+
+  if (progress.pending > 0) {
+    const nextTask = getNextPendingTask(state.tasks);
+    if (nextTask) {
+      console.log(`  Next task: ${nextTask.description.slice(0, 50)}...`);
+    }
+  } else if (progress.completed === progress.total) {
+    console.log("  Status: BUG FIX COMPLETE!");
+  }
+  console.log("-".repeat(50) + "\n");
+}
+
+export function printFeatureProgress(state: FeatureState): void {
+  const progress = getFeatureTaskProgress(state.tasks);
+
+  console.log("\n" + "-".repeat(50));
+  console.log("  FEATURE PROGRESS");
+  console.log("-".repeat(50));
+  console.log(`  Sessions completed: ${state.sessionCount}`);
+  console.log(`  Tasks: ${progress.completed}/${progress.total} completed (${progress.percentage}%)`);
+  if (progress.inProgress > 0) console.log(`  In progress: ${progress.inProgress}`);
+  if (progress.blocked > 0) console.log(`  Blocked: ${progress.blocked}`);
+  if (progress.skipped > 0) console.log(`  Skipped: ${progress.skipped}`);
+
+  if (progress.pending > 0) {
+    const nextTask = getNextPendingTask(state.tasks);
+    if (nextTask) {
+      console.log(`  Next task: ${nextTask.description.slice(0, 50)}...`);
+    }
+  } else if (progress.completed === progress.total) {
+    console.log("  Status: FEATURE COMPLETE!");
+  }
+  console.log("-".repeat(50) + "\n");
+}
+
+export function printRefactorProgress(state: RefactorState): void {
+  const progress = getRefactorProgress(state.tasks);
+
+  console.log("\n" + "-".repeat(50));
+  console.log("  REFACTOR PROGRESS");
+  console.log("-".repeat(50));
+  console.log(`  Sessions completed: ${state.sessionCount}`);
+  console.log(`  Tasks: ${progress.completed}/${progress.total} completed (${progress.percentage}%)`);
+  if (progress.inProgress > 0) console.log(`  In progress: ${progress.inProgress}`);
+  if (progress.blocked > 0) console.log(`  Blocked: ${progress.blocked}`);
+  if (progress.skipped > 0) console.log(`  Skipped: ${progress.skipped}`);
+
+  if (progress.pending > 0) {
+    const nextTask = getNextPendingTask(state.tasks);
+    if (nextTask) {
+      console.log(`  Next task: ${nextTask.description.slice(0, 50)}...`);
+    }
+  } else if (progress.completed === progress.total) {
+    console.log("  Status: REFACTOR COMPLETE!");
+  }
+  console.log("-".repeat(50) + "\n");
+}
+
 export function printProgress(state: ProjectState): void {
   if (state.type === "builder") {
     printBuilderProgress(state);
@@ -663,6 +1043,12 @@ export function printProgress(state: ProjectState): void {
     printMigratorProgress(state);
   } else if (state.type === "scaffold") {
     printScaffoldProgress(state);
+  } else if (state.type === "bugfix") {
+    printBugfixProgress(state);
+  } else if (state.type === "feature") {
+    printFeatureProgress(state);
+  } else if (state.type === "refactor") {
+    printRefactorProgress(state);
   }
 }
 
@@ -678,7 +1064,12 @@ export function isComplete(state: ProjectState): boolean {
       state.files.length > 0 &&
       state.files.every((f) => f.status === "migrated" || f.status === "skipped")
     );
-  } else if (state.type === "scaffold") {
+  } else if (
+    state.type === "scaffold" ||
+    state.type === "bugfix" ||
+    state.type === "feature" ||
+    state.type === "refactor"
+  ) {
     return (
       state.tasks.length > 0 &&
       state.tasks.every((t) => t.status === "completed" || t.status === "skipped")

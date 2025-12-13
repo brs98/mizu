@@ -6,8 +6,9 @@
  */
 
 import type { PermissionResult, CanUseTool } from "@anthropic-ai/claude-agent-sdk";
+import { type AgentType } from "./state";
 
-export type AgentType = "bugfix" | "feature" | "refactor" | "greenfield" | "builder" | "migrator" | "scaffold";
+export type { AgentType };
 
 // Base allowed commands (safe for all agents)
 const BASE_ALLOWED_COMMANDS = new Set([

@@ -4,9 +4,8 @@
  * Shared components for all specialized AI agents.
  */
 
-// Basic permissions (for quick agents)
+// Basic permissions
 export {
-  type AgentType,
   createPermissionCallback,
 } from "./permissions";
 
@@ -28,13 +27,22 @@ export {
   printCompletionSummary,
 } from "./session";
 
-// State management (for long-running agents)
+// State management (for all agents)
 export {
-  type AgentMode,
+  type AgentType,
   type LongRunningAgentType,
   type ProjectState,
   type BuilderState,
   type MigratorState,
+  type ScaffoldState,
+  type ScaffoldTask,
+  type ScaffoldTaskStatus,
+  type BugfixState,
+  type FeatureState,
+  type RefactorState,
+  type RefactorFocus,
+  type AgentTask,
+  type AgentTaskStatus,
   type FeatureTest,
   type FeatureCategory,
   type MigrationFile,
@@ -45,8 +53,16 @@ export {
   loadState,
   loadBuilderState,
   loadMigratorState,
+  loadScaffoldState,
+  loadBugfixState,
+  loadFeatureState,
+  loadRefactorState,
   createBuilderState,
   createMigratorState,
+  createScaffoldState,
+  createBugfixState,
+  createFeatureState,
+  createRefactorState,
   saveState,
   loadFeatureList,
   saveFeatureList,
@@ -58,6 +74,23 @@ export {
   syncManifestFromFile,
   getNextPendingFile,
   getMigrationProgress,
+  loadScaffoldTasks,
+  saveScaffoldTasks,
+  syncTasksFromFile,
+  getNextPendingTask,
+  getScaffoldProgress,
+  loadBugfixTasks,
+  saveBugfixTasks,
+  syncBugfixTasksFromFile,
+  getBugfixProgress,
+  loadFeatureTasks,
+  saveFeatureTasks,
+  syncFeatureTasksFromFile,
+  getFeatureTaskProgress,
+  loadRefactorTasks,
+  saveRefactorTasks,
+  syncRefactorTasksFromFile,
+  getRefactorProgress,
   appendProgress,
   readProgress,
   incrementSession,
@@ -65,6 +98,10 @@ export {
   isComplete,
   printBuilderProgress,
   printMigratorProgress,
+  printScaffoldProgress,
+  printBugfixProgress,
+  printFeatureProgress,
+  printRefactorProgress,
   printProgress,
 } from "./state";
 

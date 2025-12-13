@@ -3,14 +3,15 @@
  * AI Agents CLI
  *
  * Unified command-line interface for all specialized AI agents.
+ * All agents now use the two-phase pattern with task-based state tracking.
  *
- * Quick Tasks:
- *   ai-agent bugfix --project ./my-app --error "TypeError: ..." --depth quick
- *   ai-agent feature --project ./my-app --spec "Add dark mode" --depth standard
- *   ai-agent refactor --project ./my-app --target "src/legacy/" --depth thorough
- *
- * Long-Running Tasks:
+ * Commands:
+ *   ai-agent bugfix --project ./my-app --error "TypeError: ..."
+ *   ai-agent feature --project ./my-app --spec "Add dark mode"
+ *   ai-agent refactor --project ./my-app --target "src/legacy/"
  *   ai-agent build --project ./new-app --spec-file ./app-spec.md
+ *   ai-agent migrate --project ./migration -s src/schemas --swagger ./swagger.json
+ *   ai-agent scaffold --project ./packages/new-client -f ./prd.md -r ./packages/existing-client
  *   ai-agent resume --project ./my-app
  *   ai-agent status --project ./my-app
  */
@@ -33,9 +34,15 @@ import {
   getFeatureProgress,
   getMigrationProgress,
   getScaffoldProgress,
+  getBugfixProgress,
+  getFeatureTaskProgress,
+  getRefactorProgress,
   type BuilderState,
   type MigratorState,
   type ScaffoldState,
+  type BugfixState,
+  type FeatureState,
+  type RefactorState,
 } from "./core/state";
 
 const DEFAULT_MODEL = "claude-sonnet-4-5";
@@ -46,18 +53,18 @@ program
   .version("0.2.0");
 
 // =============================================================================
-// Quick Task Commands
+// Agent Commands (All now use two-phase pattern)
 // =============================================================================
 
 // Bug Fix command
 program
   .command("bugfix")
-  .description("Diagnose and fix bugs from error logs")
+  .description("Diagnose and fix bugs from error logs (multi-session)")
   .requiredOption("-p, --project <path>", "Project directory to work in")
   .option("-e, --error <text>", "Error message or stack trace to fix")
   .option("-f, --error-file <path>", "Path to file containing error log")
   .option("-m, --model <name>", "Claude model to use", DEFAULT_MODEL)
-  .option("-i, --max-iterations <number>", "Max iterations (default: unlimited)")
+  .option("--max-sessions <number>", "Maximum number of sessions")
   .action(async (options) => {
     // Validate inputs
     if (!options.error && !options.errorFile) {
@@ -75,13 +82,29 @@ program
       process.exit(1);
     }
 
+    const projectDir = resolve(options.project);
+
+    // Check if project already has state
+    if (hasExistingState(projectDir)) {
+      const existingType = detectStateType(projectDir);
+      if (existingType === "bugfix") {
+        console.log("\nNote: Bugfix already in progress.");
+        console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
+        console.log("Or delete .ai-agent-state.json to start fresh.\n");
+        process.exit(1);
+      } else {
+        console.error(`Error: Project has existing ${existingType} state.`);
+        process.exit(1);
+      }
+    }
+
     try {
       await runBugFix({
-        projectDir: resolve(options.project),
+        projectDir,
         errorInput: options.error,
         errorFile: options.errorFile ? resolve(options.errorFile) : undefined,
         model: options.model,
-        maxIterations: options.maxIterations ? parseInt(options.maxIterations, 10) : undefined,
+        maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
       });
     } catch (err) {
       console.error("Fatal error:", err);
@@ -89,15 +112,15 @@ program
     }
   });
 
-// Feature command (quick)
+// Feature command
 program
   .command("feature")
-  .description("Add new features to existing code (quick task)")
+  .description("Add new features to existing code (multi-session)")
   .requiredOption("-p, --project <path>", "Project directory to work in")
   .option("-s, --spec <text>", "Feature specification text")
   .option("-f, --spec-file <path>", "Path to feature specification file")
   .option("-m, --model <name>", "Claude model to use", DEFAULT_MODEL)
-  .option("-i, --max-iterations <number>", "Max iterations (default: unlimited)")
+  .option("--max-sessions <number>", "Maximum number of sessions")
   .action(async (options) => {
     if (!options.spec && !options.specFile) {
       console.error("Error: Must provide either --spec or --spec-file");
@@ -114,13 +137,29 @@ program
       process.exit(1);
     }
 
+    const projectDir = resolve(options.project);
+
+    // Check if project already has state
+    if (hasExistingState(projectDir)) {
+      const existingType = detectStateType(projectDir);
+      if (existingType === "feature") {
+        console.log("\nNote: Feature implementation already in progress.");
+        console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
+        console.log("Or delete .ai-agent-state.json to start fresh.\n");
+        process.exit(1);
+      } else {
+        console.error(`Error: Project has existing ${existingType} state.`);
+        process.exit(1);
+      }
+    }
+
     try {
       await runFeature({
-        projectDir: resolve(options.project),
+        projectDir,
         specText: options.spec,
         specFile: options.specFile ? resolve(options.specFile) : undefined,
         model: options.model,
-        maxIterations: options.maxIterations ? parseInt(options.maxIterations, 10) : undefined,
+        maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
       });
     } catch (err) {
       console.error("Fatal error:", err);
@@ -131,25 +170,41 @@ program
 // Refactor command
 program
   .command("refactor")
-  .description("Improve code quality without changing behavior")
+  .description("Improve code quality without changing behavior (multi-session)")
   .requiredOption("-p, --project <path>", "Project directory to work in")
   .option("-t, --target <path>", "Target path/pattern to refactor (e.g., 'src/legacy/')")
   .option("--focus <area>", "Focus area: performance, readability, patterns, all", "all")
   .option("-m, --model <name>", "Claude model to use", DEFAULT_MODEL)
-  .option("-i, --max-iterations <number>", "Max iterations (default: unlimited)")
+  .option("--max-sessions <number>", "Maximum number of sessions")
   .action(async (options) => {
     if (!existsSync(options.project)) {
       console.error(`Error: Project directory not found: ${options.project}`);
       process.exit(1);
     }
 
+    const projectDir = resolve(options.project);
+
+    // Check if project already has state
+    if (hasExistingState(projectDir)) {
+      const existingType = detectStateType(projectDir);
+      if (existingType === "refactor") {
+        console.log("\nNote: Refactoring already in progress.");
+        console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
+        console.log("Or delete .ai-agent-state.json to start fresh.\n");
+        process.exit(1);
+      } else {
+        console.error(`Error: Project has existing ${existingType} state.`);
+        process.exit(1);
+      }
+    }
+
     try {
       await runRefactor({
-        projectDir: resolve(options.project),
+        projectDir,
         target: options.target,
         focus: options.focus as "performance" | "readability" | "patterns" | "all",
         model: options.model,
-        maxIterations: options.maxIterations ? parseInt(options.maxIterations, 10) : undefined,
+        maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
       });
     } catch (err) {
       console.error("Fatal error:", err);
@@ -157,14 +212,10 @@ program
     }
   });
 
-// =============================================================================
-// Long-Running Task Commands
-// =============================================================================
-
-// Build command (long-running)
+// Build command
 program
   .command("build")
-  .description("Build a complete application from specification (long-running)")
+  .description("Build a complete application from specification (multi-session)")
   .requiredOption("-p, --project <path>", "Project directory to create/work in")
   .option("-s, --spec <text>", "Application specification text")
   .option("-f, --spec-file <path>", "Path to specification file")
@@ -183,15 +234,18 @@ program
       process.exit(1);
     }
 
-    // Check if project already has state (might want to use 'resume' instead)
     const projectDir = resolve(options.project);
-    if (hasExistingState(projectDir)) {
-      console.log("\nNote: Project already has existing state.");
-      console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
-      console.log("Or delete .ai-agent-state.json to start fresh.\n");
 
-      const continueAnyway = process.env.FORCE_NEW_BUILD === "1";
-      if (!continueAnyway) {
+    // Check if project already has state
+    if (hasExistingState(projectDir)) {
+      const existingType = detectStateType(projectDir);
+      if (existingType === "builder") {
+        console.log("\nNote: Build already in progress.");
+        console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
+        console.log("Or delete .ai-agent-state.json to start fresh.\n");
+        process.exit(1);
+      } else {
+        console.error(`Error: Project has existing ${existingType} state.`);
         process.exit(1);
       }
     }
@@ -212,71 +266,7 @@ program
     }
   });
 
-// Resume command
-program
-  .command("resume")
-  .description("Resume a long-running task from saved state")
-  .requiredOption("-p, --project <path>", "Project directory with existing state")
-  .option("-m, --model <name>", "Claude model to use (overrides saved)")
-  .option("--max-sessions <number>", "Maximum additional sessions to run")
-  .action(async (options) => {
-    const projectDir = resolve(options.project);
-
-    if (!existsSync(projectDir)) {
-      console.error(`Error: Project directory not found: ${projectDir}`);
-      process.exit(1);
-    }
-
-    if (!hasExistingState(projectDir)) {
-      console.error(`Error: No saved state found in ${projectDir}`);
-      console.error("Use 'ai-agent build' to start a new project.");
-      process.exit(1);
-    }
-
-    const stateType = detectStateType(projectDir);
-
-    try {
-      if (stateType === "builder") {
-        await runBuilder({
-          projectDir,
-          model: options.model,
-          maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
-        });
-      } else if (stateType === "migrator") {
-        // Load state to get sourceDir
-        const state = loadState(projectDir) as MigratorState;
-        await runMigrator({
-          projectDir,
-          sourceDir: state.sourceDir,
-          targetDir: state.targetDir,
-          migrationType: state.migrationType,
-          model: options.model,
-          maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
-        });
-      } else if (stateType === "scaffold") {
-        // Load state to get reference dir and read paths
-        const state = loadState(projectDir) as ScaffoldState;
-        await runScaffold({
-          projectDir,
-          specFile: state.specFile,
-          specText: state.specText,
-          referenceDir: state.referenceDir,
-          additionalReadPaths: state.additionalReadPaths,
-          verificationCommands: state.verificationCommands,
-          model: options.model,
-          maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
-        });
-      } else {
-        console.error(`Error: Unknown state type: ${stateType}`);
-        process.exit(1);
-      }
-    } catch (err) {
-      console.error("Fatal error:", err);
-      process.exit(1);
-    }
-  });
-
-// Migrate command (long-running)
+// Migrate command
 program
   .command("migrate")
   .description("Migrate schemas across a codebase (e.g., Zod to OpenAPI)")
@@ -294,7 +284,7 @@ program
     if (hasExistingState(projectDir)) {
       const existingType = detectStateType(projectDir);
       if (existingType === "migrator") {
-        console.log("\nNote: Project already has migration state.");
+        console.log("\nNote: Migration already in progress.");
         console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
         process.exit(1);
       } else {
@@ -319,10 +309,10 @@ program
     }
   });
 
-// Scaffold command (long-running)
+// Scaffold command
 program
   .command("scaffold")
-  .description("Scaffold new packages/projects from specifications (long-running)")
+  .description("Scaffold new packages/projects from specifications (multi-session)")
   .requiredOption("-p, --project <path>", "Project directory to create/work in")
   .option("-s, --spec <text>", "Specification text describing what to build")
   .option("-f, --spec-file <path>", "Path to specification file (e.g., PRD)")
@@ -348,7 +338,7 @@ program
     if (hasExistingState(projectDir)) {
       const existingType = detectStateType(projectDir);
       if (existingType === "scaffold") {
-        console.log("\nNote: Project already has scaffold state.");
+        console.log("\nNote: Scaffold already in progress.");
         console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
         process.exit(1);
       } else {
@@ -384,10 +374,105 @@ program
     }
   });
 
-// Status command
+// =============================================================================
+// Resume Command (handles all agent types)
+// =============================================================================
+
+program
+  .command("resume")
+  .description("Resume any agent from saved state")
+  .requiredOption("-p, --project <path>", "Project directory with existing state")
+  .option("-m, --model <name>", "Claude model to use (overrides saved)")
+  .option("--max-sessions <number>", "Maximum additional sessions to run")
+  .action(async (options) => {
+    const projectDir = resolve(options.project);
+
+    if (!existsSync(projectDir)) {
+      console.error(`Error: Project directory not found: ${projectDir}`);
+      process.exit(1);
+    }
+
+    if (!hasExistingState(projectDir)) {
+      console.error(`Error: No saved state found in ${projectDir}`);
+      console.error("Use one of the agent commands to start a new task.");
+      process.exit(1);
+    }
+
+    const stateType = detectStateType(projectDir);
+
+    try {
+      if (stateType === "bugfix") {
+        const state = loadState(projectDir) as BugfixState;
+        await runBugFix({
+          projectDir,
+          errorInput: state.errorInput,
+          errorFile: state.errorFile,
+          model: options.model,
+          maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
+        });
+      } else if (stateType === "feature") {
+        const state = loadState(projectDir) as FeatureState;
+        await runFeature({
+          projectDir,
+          specText: state.specText,
+          specFile: state.specFile,
+          model: options.model,
+          maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
+        });
+      } else if (stateType === "refactor") {
+        const state = loadState(projectDir) as RefactorState;
+        await runRefactor({
+          projectDir,
+          target: state.target,
+          focus: state.focus,
+          model: options.model,
+          maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
+        });
+      } else if (stateType === "builder") {
+        await runBuilder({
+          projectDir,
+          model: options.model,
+          maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
+        });
+      } else if (stateType === "migrator") {
+        const state = loadState(projectDir) as MigratorState;
+        await runMigrator({
+          projectDir,
+          sourceDir: state.sourceDir,
+          targetDir: state.targetDir,
+          migrationType: state.migrationType,
+          model: options.model,
+          maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
+        });
+      } else if (stateType === "scaffold") {
+        const state = loadState(projectDir) as ScaffoldState;
+        await runScaffold({
+          projectDir,
+          specFile: state.specFile,
+          specText: state.specText,
+          referenceDir: state.referenceDir,
+          additionalReadPaths: state.additionalReadPaths,
+          verificationCommands: state.verificationCommands,
+          model: options.model,
+          maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
+        });
+      } else {
+        console.error(`Error: Unknown state type: ${stateType}`);
+        process.exit(1);
+      }
+    } catch (err) {
+      console.error("Fatal error:", err);
+      process.exit(1);
+    }
+  });
+
+// =============================================================================
+// Status Command (handles all agent types)
+// =============================================================================
+
 program
   .command("status")
-  .description("Show progress of a long-running task")
+  .description("Show progress of any agent task")
   .requiredOption("-p, --project <path>", "Project directory to check")
   .option("--json", "Output as JSON")
   .action((options) => {
@@ -411,55 +496,35 @@ program
 
     if (options.json) {
       // JSON output
+      let progress;
       if (state.type === "builder") {
-        const progress = getFeatureProgress((state as BuilderState).features);
-        console.log(
-          JSON.stringify(
-            {
-              type: state.type,
-              initialized: state.initialized,
-              sessionCount: state.sessionCount,
-              createdAt: state.createdAt,
-              updatedAt: state.updatedAt,
-              progress,
-            },
-            null,
-            2
-          )
-        );
+        progress = getFeatureProgress((state as BuilderState).features);
       } else if (state.type === "migrator") {
-        const progress = getMigrationProgress((state as MigratorState).files);
-        console.log(
-          JSON.stringify(
-            {
-              type: state.type,
-              initialized: state.initialized,
-              sessionCount: state.sessionCount,
-              createdAt: state.createdAt,
-              updatedAt: state.updatedAt,
-              progress,
-            },
-            null,
-            2
-          )
-        );
+        progress = getMigrationProgress((state as MigratorState).files);
       } else if (state.type === "scaffold") {
-        const progress = getScaffoldProgress((state as ScaffoldState).tasks);
-        console.log(
-          JSON.stringify(
-            {
-              type: state.type,
-              initialized: state.initialized,
-              sessionCount: state.sessionCount,
-              createdAt: state.createdAt,
-              updatedAt: state.updatedAt,
-              progress,
-            },
-            null,
-            2
-          )
-        );
+        progress = getScaffoldProgress((state as ScaffoldState).tasks);
+      } else if (state.type === "bugfix") {
+        progress = getBugfixProgress((state as BugfixState).tasks);
+      } else if (state.type === "feature") {
+        progress = getFeatureTaskProgress((state as FeatureState).tasks);
+      } else if (state.type === "refactor") {
+        progress = getRefactorProgress((state as RefactorState).tasks);
       }
+
+      console.log(
+        JSON.stringify(
+          {
+            type: state.type,
+            initialized: state.initialized,
+            sessionCount: state.sessionCount,
+            createdAt: state.createdAt,
+            updatedAt: state.updatedAt,
+            progress,
+          },
+          null,
+          2
+        )
+      );
     } else {
       // Human-readable output
       console.log("\n" + "=".repeat(50));
@@ -493,58 +558,42 @@ program.addHelpText(
   "after",
   `
 Examples:
-  # Quick Tasks (minutes)
-  # ----------------------
+  # All agents use multi-session task-based state tracking
+  # Session 1 creates a task list, subsequent sessions execute tasks one by one
+  # All agents support resume and status commands
 
-  # Bug fix from error message
+  # Bug fix
   $ ai-agent bugfix -p ./my-app -e "TypeError: Cannot read property 'x' of undefined"
-
-  # Bug fix from error log file
   $ ai-agent bugfix -p ./my-app -f ./error.log
 
-  # Bug fix with limited iterations
-  $ ai-agent bugfix -p ./my-app -e "Error message" -i 5
-
-  # Add a small feature
+  # Feature implementation
   $ ai-agent feature -p ./my-app -s "Add a dark mode toggle to settings"
+  $ ai-agent feature -p ./my-app -f ./feature-spec.md
 
-  # Refactor for performance
+  # Refactoring
   $ ai-agent refactor -p ./my-app -t "src/api/" --focus performance
+  $ ai-agent refactor -p ./my-app --focus readability
 
-
-  # Long-Running Tasks (hours)
-  # --------------------------
-
-  # Build a complete application from spec
+  # Build complete application
   $ ai-agent build -p ./new-app -f ./app-spec.md
 
-  # Migrate schemas from Zod to OpenAPI types
+  # Schema migration
   $ ai-agent migrate -p ./migration-state -s src/schemas --swagger ./swagger.json
 
-  # Scaffold a new package from a PRD with reference implementation
+  # Scaffold new package with reference
   $ ai-agent scaffold -p ./packages/new-api-client -f ./prd.md -r ./packages/existing-client
 
-  # Scaffold with additional read paths (for cross-repo access)
-  $ ai-agent scaffold -p ./my-package -f ./spec.md --read-paths "/path/to/backend,/path/to/shared"
-
-  # Resume a long-running task
+  # Resume any agent
   $ ai-agent resume -p ./my-app
 
-  # Check progress
+  # Check progress of any agent
   $ ai-agent status -p ./my-app
+  $ ai-agent status -p ./my-app --json
 
-
-Options:
-  --max-iterations, -i  Limit the number of iterations (default: unlimited)
-
-Long-Running Tasks:
-  'build'    - Build complete applications with browser testing and feature tracking
-  'migrate'  - Migrate schemas across codebases with dependency-aware ordering
-  'scaffold' - Scaffold new packages/projects from specifications with reference support
-
-  All support:
+All agents support:
   - Persistent state for crash recovery
-  - Git-based progress tracking
+  - Task-based progress tracking
+  - Git-based change tracking
   - Resume from any point with 'resume' command
 `
 );

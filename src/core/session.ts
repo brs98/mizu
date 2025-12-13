@@ -1,6 +1,17 @@
 /**
  * Multi-Session Agent Runner
  *
+ * @deprecated Use `runLongRunningAgent` from `longrunning.ts` instead.
+ * All agents now use the two-phase pattern (initializer → worker) with
+ * persistent task-based state tracking. This module is kept for backwards
+ * compatibility but will be removed in a future version.
+ *
+ * Migration guide:
+ * - Replace `runMultiSessionAgent` with `runLongRunningAgent`
+ * - Add state management using the appropriate state type (BuilderState, etc.)
+ * - Create initializer.md and worker.md prompts
+ * - Use task-based tracking instead of iteration counts
+ *
  * Provides the core loop for running agents across multiple sessions.
  * Handles:
  * - Session continuation with resume

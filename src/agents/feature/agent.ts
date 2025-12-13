@@ -2,160 +2,494 @@
  * Feature Agent
  *
  * Add new functionality to existing codebases.
+ * Now uses the two-phase pattern with task-based state tracking:
  *
- * The feature agent:
- * 1. Analyzes existing codebase patterns
- * 2. Plans implementation following existing conventions
- * 3. Implements features incrementally
- * 4. Writes tests matching existing test patterns
+ * Session 1 (Initializer): Analyzes spec, creates feature_tasks.json with implementation steps
+ * Sessions 2+ (Worker): Executes one task per session until feature is complete
+ *
+ * Task breakdown typically includes:
+ * - Analyze requirements and existing codebase
+ * - Design implementation approach
+ * - Implement core feature logic
+ * - Add tests
+ * - Integrate and verify
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { loadAndRenderPrompt } from "../../core/prompts";
 import {
-  runMultiSessionAgent,
-  printAgentHeader,
-  printCompletionSummary,
-} from "../../core/session";
+  type FeatureState,
+  createFeatureState,
+  loadFeatureState,
+  saveState,
+  syncFeatureTasksFromFile,
+  getFeatureTaskProgress,
+  isComplete,
+  printFeatureProgress,
+  appendProgress,
+  markInitialized,
+  incrementSession,
+  getNextPendingTask,
+} from "../../core/state";
+import { loadAndRenderPrompt, type PromptContext } from "../../core/prompts";
+import {
+  runLongRunningAgent,
+  printLongRunningHeader,
+  printLongRunningCompletion,
+} from "../../core/longrunning";
 
-const PROMPTS_DIR = resolve(dirname(import.meta.path), "prompts");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PROMPTS_DIR = resolve(__dirname, "prompts");
+
+// =============================================================================
+// Types
+// =============================================================================
 
 export interface FeatureOptions {
   projectDir: string;
   specFile?: string;
   specText?: string;
   model?: string;
-  maxIterations?: number;
+  maxSessions?: number;
 }
 
+// =============================================================================
+// System Prompt
+// =============================================================================
+
 const SYSTEM_PROMPT = `You are an expert software developer focused on adding features to existing codebases.
-You analyze existing patterns and conventions before implementing.
-You write code that looks like it belongs in the codebase.
-You write tests that match the existing test style.
-You make incremental, reviewable changes.
 
-When implementation is complete and verified, you MUST say "Feature implementation complete" to indicate completion.`;
+You work methodically, one task at a time, ensuring each step is verified before moving on.
 
-function getFeaturePrompt(spec: string): string {
-  const context = {
-    spec,
+You understand that:
+- Quality matters more than speed
+- Each session is independent - you have no memory of previous sessions
+- feature_tasks.json is the source of truth for progress
+- Git history shows what was done before
+- Verification proves tasks are actually complete
+
+You always:
+- Read feature_tasks.json to understand what needs to be done
+- Check git log to see recent progress
+- Analyze existing patterns before implementing
+- Write code that matches existing conventions
+- Write tests matching the existing test style
+- Verify your work before marking tasks complete
+- Commit progress with descriptive messages
+- Update feature_tasks.json and claude-progress.txt before ending
+
+You never:
+- Try to complete multiple tasks at once without verification
+- Mark tasks as completed without running verification
+- Implement without understanding existing patterns
+- Leave the codebase in a broken state
+
+When the feature is complete:
+- All tasks in feature_tasks.json should be marked "completed"
+- Tests should pass
+- Say "Feature implementation complete" to indicate completion`;
+
+// =============================================================================
+// Prompt Context
+// =============================================================================
+
+interface FeaturePromptContext extends PromptContext {
+  project_dir: string;
+  model: string;
+  session_number: number;
+  spec_text?: string;
+  spec_file?: string;
+  total_tasks: number;
+  completed_tasks: number;
+  remaining_tasks: number;
+  percentage: number;
+}
+
+// =============================================================================
+// Prompt Generation
+// =============================================================================
+
+function getInitializerPrompt(state: FeatureState): string {
+  // Load spec text from file if provided
+  let specText = state.specText;
+  if (state.specFile && existsSync(state.specFile)) {
+    specText = readFileSync(state.specFile, "utf-8");
+  }
+
+  const context: FeaturePromptContext = {
+    project_dir: state.projectDir,
+    model: state.model,
+    session_number: state.sessionCount + 1,
+    spec_text: specText,
+    spec_file: state.specFile,
+    total_tasks: 0,
+    completed_tasks: 0,
+    remaining_tasks: 0,
+    percentage: 0,
   };
 
-  // Try to load from prompt file
-  const promptFile = resolve(PROMPTS_DIR, "implement.md");
+  const promptFile = resolve(PROMPTS_DIR, "initializer.md");
   if (existsSync(promptFile)) {
     return loadAndRenderPrompt(promptFile, context);
   }
 
-  // Fallback to inline prompt
-  return `# Feature Implementation
+  // Fallback prompt
+  return getFallbackInitializerPrompt(context);
+}
 
-## Instructions
+function getWorkerPrompt(state: FeatureState): string {
+  const progress = getFeatureTaskProgress(state.tasks);
 
-1. Analyze existing code patterns in related areas
-2. Plan the implementation approach
-3. Implement following existing conventions
-4. Write tests matching existing test patterns
-5. Verify integration with existing features
+  // Load spec text from file if provided
+  let specText = state.specText;
+  if (state.specFile && existsSync(state.specFile)) {
+    specText = readFileSync(state.specFile, "utf-8");
+  }
+
+  const context: FeaturePromptContext = {
+    project_dir: state.projectDir,
+    model: state.model,
+    session_number: state.sessionCount + 1,
+    spec_text: specText,
+    spec_file: state.specFile,
+    total_tasks: progress.total,
+    completed_tasks: progress.completed,
+    remaining_tasks: progress.pending + progress.blocked,
+    percentage: progress.percentage,
+  };
+
+  const promptFile = resolve(PROMPTS_DIR, "worker.md");
+  if (existsSync(promptFile)) {
+    return loadAndRenderPrompt(promptFile, context);
+  }
+
+  // Fallback prompt
+  return getFallbackWorkerPrompt(context);
+}
+
+// =============================================================================
+// Fallback Prompts
+// =============================================================================
+
+function getFallbackInitializerPrompt(context: FeaturePromptContext): string {
+  return `# Feature Initializer - Session 1
+
+You are setting up a feature implementation in ${context.project_dir}.
 
 ## Feature Specification
 
-${spec}
+${context.spec_text || "No specification provided - analyze the requirements from context"}
 
-## Your Task
+${context.spec_file ? `Spec file: ${context.spec_file}` : ""}
 
-Implement this feature following the codebase's existing patterns and conventions.
+## Your Tasks
 
-When implementation is complete and verified, say "Feature implementation complete" to indicate completion.`;
+1. **Analyze the Codebase**
+   - Explore the project structure
+   - Identify related existing functionality
+   - Understand patterns and conventions used
+
+2. **Plan the Implementation**
+   - Identify what needs to be built
+   - Determine which files need modification
+   - Plan the integration points
+
+3. **Create feature_tasks.json**
+   Break down the feature into concrete, verifiable tasks:
+
+\`\`\`json
+[
+  {
+    "id": "feature-001",
+    "description": "Analyze requirements and existing codebase patterns",
+    "status": "pending",
+    "dependencies": []
+  },
+  {
+    "id": "feature-002",
+    "description": "Design implementation approach following existing conventions",
+    "status": "pending",
+    "dependencies": ["feature-001"]
+  },
+  {
+    "id": "feature-003",
+    "description": "Implement core feature logic",
+    "status": "pending",
+    "dependencies": ["feature-002"]
+  },
+  {
+    "id": "feature-004",
+    "description": "Add unit and integration tests",
+    "status": "pending",
+    "dependencies": ["feature-003"]
+  },
+  {
+    "id": "feature-005",
+    "description": "Integrate with existing code and verify all tests pass",
+    "status": "pending",
+    "verificationCommand": "pnpm test",
+    "dependencies": ["feature-004"]
+  }
+]
+\`\`\`
+
+4. **Initialize Git Tracking**
+\`\`\`bash
+git add feature_tasks.json
+git commit -m "Initialize feature implementation tasks"
+\`\`\`
+
+5. **Create claude-progress.txt**
+   Document your analysis and planned approach.
+
+## Task Guidelines
+
+- Each task should be independently verifiable
+- Use verificationCommand when possible
+- Order tasks by dependencies
+- Include 5-10 tasks depending on feature complexity
+- All tasks start with "status": "pending"
+
+When done, the next session will begin executing tasks one by one.`;
 }
 
-function getContinuationPrompt(spec: string): string {
-  return `# Continue Feature Implementation
+function getFallbackWorkerPrompt(context: FeaturePromptContext): string {
+  return `# Feature Worker - Session ${context.session_number}
 
-You are continuing work on implementing a feature. This is a fresh context window.
+Continue implementing the feature in ${context.project_dir}.
+
+## Progress
+- Tasks: ${context.completed_tasks}/${context.total_tasks} completed (${context.percentage}%)
+- Remaining: ${context.remaining_tasks}
 
 ## Feature Specification
-${spec}
+${context.spec_text || "See feature_tasks.json for task details"}
 
-## Instructions
+## Your Tasks
 
-1. Check the current state of the implementation
-2. Review what has been done so far (check git log, modified files)
-3. Continue implementing the remaining functionality
-4. Write tests for new code
-5. Verify everything works together
+1. **Get Your Bearings**
+\`\`\`bash
+pwd
+git log --oneline -10
+cat claude-progress.txt
+\`\`\`
 
-When implementation is complete and verified, say "Feature implementation complete" to indicate completion.`;
+2. **Read feature_tasks.json**
+   Find the next pending task whose dependencies are all completed.
+
+3. **Execute the Task**
+   - Implement what the task describes
+   - Follow existing codebase patterns
+   - Write code that matches existing conventions
+
+4. **Verify the Task**
+   Run the task's verificationCommand (if provided):
+\`\`\`bash
+# Example: pnpm test
+\`\`\`
+
+5. **Update feature_tasks.json**
+   Mark the task as completed:
+\`\`\`json
+{
+  "id": "feature-XXX",
+  "status": "completed",
+  "completedAt": "2024-01-15T10:30:00Z"
+}
+\`\`\`
+
+6. **Commit Progress**
+\`\`\`bash
+git add -A
+git commit -m "feature: complete task-XXX - <description>"
+\`\`\`
+
+7. **Update claude-progress.txt**
+   Document what you did in this session.
+
+## Completion
+
+When ALL tasks are completed and verified:
+- All tests should pass
+- Say "Feature implementation complete" to indicate completion
+
+Work on ONE task at a time. Leave the codebase in a working state.`;
 }
 
-/**
- * Run the feature agent
- */
+// =============================================================================
+// State Management
+// =============================================================================
+
+function loadOrCreateState(options: FeatureOptions): FeatureState {
+  const projectDir = resolve(options.projectDir);
+
+  // Try to load existing state
+  const existing = loadFeatureState(projectDir);
+  if (existing) {
+    // Sync tasks from file (agent may have modified it)
+    return syncFeatureTasksFromFile(existing);
+  }
+
+  // Load spec from file if provided
+  let specText = options.specText;
+  if (options.specFile && existsSync(options.specFile)) {
+    specText = readFileSync(options.specFile, "utf-8");
+  }
+
+  // Create new state
+  return createFeatureState({
+    projectDir,
+    model: options.model ?? "claude-sonnet-4-5",
+    specFile: options.specFile,
+    specText,
+  });
+}
+
+// =============================================================================
+// Completion Detection
+// =============================================================================
+
+function checkFeatureCompletion(response: string, state: FeatureState): boolean {
+  // Re-sync tasks from file after each session
+  const updated = syncFeatureTasksFromFile(state);
+
+  // Check if all tasks are complete
+  if (isComplete(updated)) {
+    return true;
+  }
+
+  // Also check for explicit completion phrases (fallback)
+  const lower = response.toLowerCase();
+  const completionPhrases = [
+    "feature implementation complete",
+    "implementation complete",
+    "feature complete",
+    "successfully implemented",
+    "all tasks completed",
+  ];
+
+  return completionPhrases.some((phrase) => lower.includes(phrase));
+}
+
+// =============================================================================
+// Main Entry Point
+// =============================================================================
+
 export async function runFeature(options: FeatureOptions): Promise<void> {
   const {
     projectDir,
     specFile,
     specText,
     model = "claude-sonnet-4-5",
-    maxIterations,
+    maxSessions,
   } = options;
 
-  // Load spec
-  let spec = specText ?? "";
-  if (specFile && existsSync(specFile)) {
-    spec = readFileSync(specFile, "utf-8");
-  }
-
-  if (!spec) {
+  // Validate spec input
+  const hasSpec = specText || (specFile && existsSync(specFile));
+  if (!hasSpec) {
     console.error("Error: Must provide feature specification via --spec or --spec-file");
     process.exit(1);
   }
 
   const resolvedProjectDir = resolve(projectDir);
 
+  // Ensure project directory exists
+  if (!existsSync(resolvedProjectDir)) {
+    mkdirSync(resolvedProjectDir, { recursive: true });
+  }
+
+  // Load or create state
+  let state = loadOrCreateState({ ...options, projectDir: resolvedProjectDir, model });
+
   // Print header
-  printAgentHeader("Feature Agent", resolvedProjectDir, model, maxIterations);
+  printLongRunningHeader({
+    agentName: "Feature Agent",
+    projectDir: resolvedProjectDir,
+    model,
+    stateType: "feature",
+    initialized: state.initialized,
+    sessionCount: state.sessionCount,
+    maxSessions,
+  });
 
-  console.log(`Spec (${spec.length} chars):`);
-  const preview = spec.length > 300 ? spec.slice(0, 300) + "..." : spec;
-  console.log(`  ${preview}\n`);
+  // Print spec preview
+  const spec = state.specText || (state.specFile && existsSync(state.specFile)
+    ? readFileSync(state.specFile, "utf-8")
+    : "");
+  if (spec) {
+    const preview = spec.length > 300 ? spec.slice(0, 300) + "..." : spec;
+    console.log(`Spec (${spec.length} chars):`);
+    console.log(`  ${preview}\n`);
+  }
 
-  // Completion markers for feature
-  const isComplete = (response: string): boolean => {
-    const lower = response.toLowerCase();
-    return (
-      lower.includes("feature implementation complete") ||
-      lower.includes("implementation complete") ||
-      lower.includes("feature complete") ||
-      lower.includes("successfully implemented")
-    );
-  };
+  if (state.initialized) {
+    printFeatureProgress(state);
+  }
 
-  // Run multi-session agent
-  const result = await runMultiSessionAgent(
-    {
-      projectDir: resolvedProjectDir,
-      model,
-      agentType: "feature",
-      systemPrompt: SYSTEM_PROMPT,
-      maxIterations,
+  // Run the long-running agent loop
+  const result = await runLongRunningAgent({
+    projectDir: resolvedProjectDir,
+    model,
+    agentType: "feature",
+    systemPrompt: SYSTEM_PROMPT,
+    maxSessions: maxSessions ?? Infinity,
+    enablePuppeteer: false,
+    sandboxEnabled: true,
+
+    getPrompt: (sessionNumber, currentState) => {
+      const featureState = currentState as FeatureState;
+      if (!featureState.initialized) {
+        return getInitializerPrompt(featureState);
+      }
+      return getWorkerPrompt(featureState);
     },
-    {
-      getPrompt: (iteration) => {
-        if (iteration === 1) {
-          return getFeaturePrompt(spec);
-        }
-        return getContinuationPrompt(spec);
-      },
-      isComplete,
-      onComplete: () => {
-        console.log("Feature implementation complete!");
-      },
-    }
-  );
 
-  // Print summary
-  printCompletionSummary("Feature Agent", result.completed, result.iterations);
+    loadState: () => loadOrCreateState({ ...options, projectDir: resolvedProjectDir, model }),
+
+    saveState: (updatedState) => {
+      state = updatedState as FeatureState;
+      saveState(state);
+    },
+
+    onSessionStart: (sessionNumber) => {
+      console.log(`\n--- Feature Session ${sessionNumber} ---\n`);
+    },
+
+    onSessionEnd: (sessionNumber, response) => {
+      // Sync state from files
+      state = syncFeatureTasksFromFile(state);
+      state = incrementSession(state) as FeatureState;
+
+      if (!state.initialized) {
+        state = markInitialized(state) as FeatureState;
+      }
+
+      saveState(state);
+
+      // Append to progress
+      const progress = getFeatureTaskProgress(state.tasks);
+      appendProgress(
+        resolvedProjectDir,
+        `Session ${sessionNumber} completed. Tasks: ${progress.completed}/${progress.total} completed.`
+      );
+    },
+
+    isComplete: (response) => checkFeatureCompletion(response, state),
+  });
+
+  // Print completion summary
+  printLongRunningCompletion({
+    agentName: "Feature Agent",
+    completed: result.completed,
+    sessions: result.sessions,
+    state,
+  });
 }
+
+// =============================================================================
+// Exports
+// =============================================================================
+
+export { getInitializerPrompt, getWorkerPrompt };
