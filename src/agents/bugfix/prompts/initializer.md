@@ -38,7 +38,7 @@ Error file: {{ error_file }}
    - Look for similar patterns in the codebase
 
 3. **Create bugfix_tasks.json**
-   Break down the bug fix into concrete, verifiable tasks:
+   Break down the bug fix into concrete, verifiable tasks using **Test-Driven Development (TDD)**:
 
 ```json
 [
@@ -56,14 +56,15 @@ Error file: {{ error_file }}
   },
   {
     "id": "bugfix-003",
-    "description": "Implement the fix for the root cause",
+    "description": "Write failing test that reproduces the bug (TDD: RED)",
     "status": "pending",
-    "verificationCommand": "pnpm typecheck",
+    "verificationCommand": "pnpm test || true",
+    "notes": "Test SHOULD fail - it proves the bug exists and will prevent regression",
     "dependencies": ["bugfix-002"]
   },
   {
     "id": "bugfix-004",
-    "description": "Write regression test to prevent bug from recurring",
+    "description": "Implement the fix to make test pass (TDD: GREEN)",
     "status": "pending",
     "verificationCommand": "pnpm test",
     "dependencies": ["bugfix-003"]
@@ -77,6 +78,19 @@ Error file: {{ error_file }}
   }
 ]
 ```
+
+### Test-Driven Bug Fixing
+
+Follow the **Red-Green** cycle for bug fixes:
+
+1. **RED**: Write a test that reproduces the bug. This test SHOULD fail - it proves the bug exists.
+2. **GREEN**: Fix the bug so the test passes.
+
+**Why write the test first?**
+- Proves you understand the bug before fixing it
+- Guarantees the bug won't regress
+- The test documents exactly what was broken
+- You know the fix works when the test turns green
 
 **Verification Guidelines:** Every task that modifies code should have a `verificationCommand`. Use `pnpm typecheck` for type changes, `pnpm test` for behavior changes.
 
