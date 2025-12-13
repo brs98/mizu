@@ -14,6 +14,19 @@ Error file: {{ error_file }}
 
 ## Your Tasks
 
+0. **Baseline Testing (CRITICAL)**
+
+   Before doing anything else, run the test suite to understand the current state:
+
+   ```bash
+   pnpm test
+   # or: npm test
+   ```
+
+   Document which tests are currently failing in `claude-progress.txt`. This helps you know:
+   - Whether the bug is caught by existing tests
+   - What was already broken vs what you might break
+
 1. **Analyze the Error**
    - Read the error message and stack trace carefully
    - Identify which files are involved
@@ -45,23 +58,27 @@ Error file: {{ error_file }}
     "id": "bugfix-003",
     "description": "Implement the fix for the root cause",
     "status": "pending",
+    "verificationCommand": "pnpm typecheck",
     "dependencies": ["bugfix-002"]
   },
   {
     "id": "bugfix-004",
     "description": "Write regression test to prevent bug from recurring",
     "status": "pending",
+    "verificationCommand": "pnpm test",
     "dependencies": ["bugfix-003"]
   },
   {
     "id": "bugfix-005",
     "description": "Verify fix works and all tests pass",
     "status": "pending",
-    "verificationCommand": "pnpm test",
+    "verificationCommand": "pnpm test && pnpm typecheck",
     "dependencies": ["bugfix-004"]
   }
 ]
 ```
+
+**Verification Guidelines:** Every task that modifies code should have a `verificationCommand`. Use `pnpm typecheck` for type changes, `pnpm test` for behavior changes.
 
 4. **Initialize Git Tracking** (if not already a repo)
 ```bash

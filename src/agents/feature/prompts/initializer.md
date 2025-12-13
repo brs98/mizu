@@ -12,6 +12,17 @@ Spec file: {{ spec_file }}
 
 ## Your Tasks
 
+0. **Baseline Testing (CRITICAL)**
+
+   Before doing anything else, verify the codebase is healthy:
+
+   ```bash
+   pnpm test
+   # or: npm test
+   ```
+
+   If tests fail, document the pre-existing failures in `claude-progress.txt`. You need to know what was already broken vs what you might break.
+
 1. **Analyze the Codebase**
    - Explore the project structure
    - Identify related existing functionality
@@ -43,23 +54,27 @@ Spec file: {{ spec_file }}
     "id": "feature-003",
     "description": "Implement core feature logic",
     "status": "pending",
+    "verificationCommand": "pnpm typecheck",
     "dependencies": ["feature-002"]
   },
   {
     "id": "feature-004",
     "description": "Add unit and integration tests",
     "status": "pending",
+    "verificationCommand": "pnpm test",
     "dependencies": ["feature-003"]
   },
   {
     "id": "feature-005",
     "description": "Integrate with existing code and verify all tests pass",
     "status": "pending",
-    "verificationCommand": "pnpm test",
+    "verificationCommand": "pnpm test && pnpm typecheck",
     "dependencies": ["feature-004"]
   }
 ]
 ```
+
+**Verification Guidelines:** Every task that modifies code should have a `verificationCommand`. Use `pnpm typecheck` for type changes, `pnpm test` for behavior changes, or combine them.
 
 4. **Initialize Git Tracking**
 ```bash

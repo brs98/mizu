@@ -32,13 +32,19 @@ Then read the key files:
 
 **Before implementing anything new**, verify the app is in a working state:
 
-1. Run `./init.sh` to start the development server
-2. Use Puppeteer to test basic functionality:
+1. Run unit tests to establish baseline:
+   ```bash
+   pnpm test || npm test || echo "No test script"
+   ```
+
+2. Run `./init.sh` to start the development server
+
+3. Use Puppeteer to test basic functionality:
    - Navigate to the app URL
    - Verify the page loads
    - Test 2-3 previously-passing features
 
-If something is broken, **fix it first** before adding new features.
+If something is broken (tests failing or app won't start), **fix it first** before adding new features. Document any pre-existing failures in `claude-progress.txt`.
 
 ## Step 3: Choose ONE Feature to Implement
 
@@ -74,7 +80,17 @@ Follow the testing steps in the feature entry. For example:
 
 Implement the code to make these steps work.
 
-## Step 5: Test with Browser Automation
+## Step 5: Run Unit Tests
+
+Before browser testing, run the unit test suite to catch any regressions:
+
+```bash
+pnpm test || npm test
+```
+
+Fix any failures before proceeding to browser testing.
+
+## Step 6: Test with Browser Automation
 
 {% if browser_testing_enabled %}
 Use Puppeteer tools to verify the feature works end-to-end:
@@ -87,12 +103,36 @@ Use Puppeteer tools to verify the feature works end-to-end:
 5. mcp__puppeteer__puppeteer_screenshot - Verify the result
 ```
 
-**Only mark a feature as passing after you have verified it with browser testing.**
+**Only mark a feature as passing after BOTH unit tests and browser testing pass.**
 {% else %}
 Test the feature manually or with unit tests. Verify it works before marking as complete.
 {% endif %}
 
-## Step 6: Update feature_list.json
+### Verification Failure Protocol
+
+If tests or browser verification fail:
+
+1. **Read the error output carefully**
+   - Test failure: Read the failing assertion
+   - Browser error: Check the screenshot and error message
+   - Type error: Check the file/line
+
+2. **Diagnose the issue**
+   - Did you introduce this error, or was it pre-existing?
+   - Is this a UI issue or a logic error?
+
+3. **Attempt a fix** (max 2 retries)
+   - Make a targeted fix
+   - Re-run unit tests, then browser tests
+
+4. **If still failing after 2 attempts**
+   - Add `"failureReason": "[error summary]"` to the feature
+   - Document in `claude-progress.txt`
+   - Move to the next unblocked feature
+
+**Never mark a feature as passing if verification fails.**
+
+## Step 7: Update feature_list.json
 
 After verification, update the feature entry:
 
@@ -114,7 +154,7 @@ After verification, update the feature entry:
 - **NEVER remove features**
 - **NEVER edit descriptions or steps**
 
-## Step 7: Commit Your Progress
+## Step 8: Commit Your Progress
 
 Make a descriptive commit:
 
@@ -130,7 +170,7 @@ git commit -m "feat(feat-042): implement conversation deletion
 Passes: feat-042"
 ```
 
-## Step 8: Update Progress File
+## Step 9: Update Progress File
 
 Append to `claude-progress.txt`:
 
@@ -142,7 +182,7 @@ Append to `claude-progress.txt`:
 - Notes: Used existing modal component for confirmation
 ```
 
-## Step 9: End Session Cleanly
+## Step 10: End Session Cleanly
 
 Before your context window fills up:
 

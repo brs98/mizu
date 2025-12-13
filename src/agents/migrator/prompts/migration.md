@@ -38,16 +38,21 @@ cat migration_manifest.json | head -100
 git log --oneline -10
 ```
 
-## Step 2: Verify Codebase Compiles
+## Step 2: Verify Codebase is Healthy (CRITICAL)
 
-**Before making any changes**, verify the codebase is in a good state:
+**Before making any changes**, verify the codebase compiles AND tests pass:
 
 ```bash
+# Type check
 pnpm typecheck
 # or: npm run typecheck
+
+# Run tests
+pnpm test
+# or: npm test
 ```
 
-If there are errors, fix them first before proceeding with new migrations.
+If there are errors, fix them first before proceeding with new migrations. Document any pre-existing failures in `migration_progress.txt`.
 
 ## Step 3: Identify Your Task
 
@@ -116,20 +121,57 @@ Make the changes:
    pnpm typecheck
    ```
 5. Fix any type errors
+6. Run tests to catch runtime issues:
+   ```bash
+   pnpm test
+   ```
+7. Fix any test failures
 
 ## Step 7: Verify the Migration
 
-After changes compile:
+After changes compile, run full verification:
 
-1. Check the diff makes sense:
+1. Type check:
+   ```bash
+   pnpm typecheck
+   ```
+
+2. Run tests:
+   ```bash
+   pnpm test
+   ```
+
+3. Check the diff makes sense:
    ```bash
    git diff {{ source_dir }}/path/to/file.ts
    ```
 
-2. Verify dependent files still compile:
-   ```bash
-   pnpm typecheck
-   ```
+**CRITICAL:** Only mark as `migrated` after BOTH typecheck AND tests pass.
+
+### Verification Failure Protocol
+
+If verification fails:
+
+1. **Read the error output carefully**
+   - Type error: Check file/line and expected vs actual types
+   - Test failure: Read the failing test assertion
+   - Build error: Check for missing imports
+
+2. **Diagnose the issue**
+   - Did you introduce this error, or was it pre-existing?
+   - Is the error in the migrated file or a dependent file?
+
+3. **Attempt a fix** (max 2 retries)
+   - Make a targeted fix for the specific error
+   - Re-run verification: `pnpm typecheck && pnpm test`
+
+4. **If still failing after 2 attempts**
+   - Mark the file as `"status": "blocked"` in the manifest
+   - Add `"notes": "Verification failed: [error summary]"`
+   - Document in `migration_progress.txt`
+   - Move to the next unblocked file
+
+**Never mark a file as migrated if verification fails.**
 
 ## Step 8: Update the Manifest
 

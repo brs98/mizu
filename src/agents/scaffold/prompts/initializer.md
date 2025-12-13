@@ -14,6 +14,17 @@ Your job is to analyze the specification, study any reference implementations, a
 - **Additional Read Paths**: {{ additional_read_paths }}
 {% endif %}
 
+## Step 0: Baseline Testing (CRITICAL)
+
+If this is an existing project, verify the codebase is healthy before making changes:
+
+```bash
+pnpm test 2>/dev/null || echo "No test script yet"
+pnpm typecheck 2>/dev/null || echo "No typecheck script yet"
+```
+
+Document any pre-existing failures in `claude-progress.txt`. This establishes what was already broken vs what you might break.
+
 {% if spec_file %}
 ## Step 1: Read the Specification
 

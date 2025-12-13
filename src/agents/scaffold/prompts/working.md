@@ -37,12 +37,15 @@ Then read the key files:
 
 **Before implementing anything new**, verify the project is in a working state:
 
-1. Check if there are any TypeScript errors:
-   ```bash
-   pnpm typecheck || echo "No typecheck script yet"
-   ```
+```bash
+# Run tests (if available)
+pnpm test || echo "No test script yet"
 
-2. If something is broken, **fix it first** before adding new tasks.
+# Check TypeScript errors
+pnpm typecheck || echo "No typecheck script yet"
+```
+
+If something is broken, **fix it first** before adding new tasks.
 
 ## Step 3: Choose ONE Task to Execute
 
@@ -98,6 +101,30 @@ cat <file> | grep <pat> # Content is correct
 ```
 
 **Only mark a task as completed after verification passes.**
+
+### Verification Failure Protocol
+
+If verification fails:
+
+1. **Read the error output carefully**
+   - Type error: Check the file/line and expected vs actual
+   - Build error: Check for missing imports or configuration
+   - File check failed: Verify the file was created in the right location
+
+2. **Diagnose the issue**
+   - Did you introduce this error, or was it pre-existing?
+   - Is this a typo or a logic error?
+
+3. **Attempt a fix** (max 2 retries)
+   - Make a targeted fix
+   - Re-run the verification command
+
+4. **If still failing after 2 attempts**
+   - Mark the task as `"status": "blocked"` with `"notes": "[error summary]"`
+   - Document in `claude-progress.txt`
+   - Move to the next unblocked task
+
+**Never mark a task as completed if verification fails.**
 
 ## Step 6: Update scaffold_tasks.json
 
