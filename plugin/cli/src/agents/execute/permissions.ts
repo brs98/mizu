@@ -9,6 +9,7 @@
 
 import type { PermissionResult, CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 import type { ExecutionPermissions } from "../../core/state";
+import { extractCommands } from "../../core/security";
 
 // =============================================================================
 // Permission Presets
@@ -159,31 +160,6 @@ export function mergePermissions(permissions: ExecutionPermissions): Set<string>
   // Remove explicitly denied commands
   for (const cmd of permissions.deny) {
     commands.delete(cmd);
-  }
-
-  return commands;
-}
-
-// =============================================================================
-// Command Extraction
-// =============================================================================
-
-function extractCommands(command: string): string[] {
-  // Split on pipes, &&, ||, ;
-  const segments = command.split(/\s*(?:\||\|\||&&|;)\s*/);
-  const commands: string[] = [];
-
-  for (const segment of segments) {
-    const trimmed = segment.trim();
-    if (!trimmed) continue;
-
-    // Get the first word (the command)
-    const parts = trimmed.split(/\s+/);
-    if (parts[0]) {
-      // Remove path prefix
-      const cmd = parts[0].split("/").pop() || parts[0];
-      commands.push(cmd);
-    }
   }
 
   return commands;

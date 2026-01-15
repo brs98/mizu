@@ -4,12 +4,6 @@
  * Shared components for the execute agent.
  */
 
-// Permissions
-export {
-  createPermissionCallback,
-  type AgentType,
-} from "./permissions";
-
 // Prompt utilities
 export {
   type PromptContext,
@@ -21,6 +15,7 @@ export {
 
 // State management
 export {
+  type AgentType,
   type LongRunningAgentType,
   type ProjectState,
   type ExecuteState,

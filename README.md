@@ -219,22 +219,22 @@ Execution creates state files in the project directory:
 
 ```
 mizu/
-├── plugin/                         # Claude Code plugin (recommended)
+├── plugin/                         # Claude Code plugin
 │   ├── .claude-plugin/             # Plugin manifest
 │   ├── bin/mizu                    # Shell wrapper
-│   ├── cli/                        # Bundled CLI source
+│   ├── cli/                        # CLI source
+│   │   └── src/
+│   │       ├── cli.ts              # CLI entry point
+│   │       ├── core/               # Shared infrastructure
+│   │       │   ├── longrunning.ts  # Multi-session execution runner
+│   │       │   ├── state.ts        # Persistent state management
+│   │       │   ├── security.ts     # Command validation
+│   │       │   └── ...
+│   │       └── agents/execute/     # Execute agent implementation
 │   ├── hooks/                      # SessionStart setup hook
 │   ├── mcp-server/                 # Status checking MCP tools
 │   ├── scripts/setup.sh            # PATH configuration
 │   └── skills/harness/             # /harness skill
-├── src/                            # CLI source (also in plugin/cli/)
-│   ├── cli.ts                      # CLI entry point
-│   ├── core/                       # Shared infrastructure
-│   │   ├── longrunning.ts          # Multi-session execution runner
-│   │   ├── state.ts                # Persistent state management
-│   │   ├── security.ts             # Command validation
-│   │   └── ...
-│   └── agents/execute/             # Execute agent implementation
 ├── package.json
 └── tsconfig.json
 ```
@@ -243,7 +243,7 @@ mizu/
 
 Defense-in-depth security model:
 
-- **OS-level sandbox** via `.claude_settings.json`
+- **OS-level sandbox** via `.claude/settings.local.json`
 - **Command allowlist** - Only approved bash commands
 - **Dangerous pattern blocking** - Prevents `rm -rf /`, fork bombs, etc.
 - **Process restrictions** - `pkill`/`kill` limited to dev processes
@@ -295,12 +295,15 @@ For contributors working on mizu itself:
 
 ```bash
 # Clone and install dependencies
-git clone https://github.com/anthropics/mizu.git
+git clone https://github.com/brs98/mizu.git
 cd mizu
 bun install
 
 # Run directly
-bun run src/cli.ts execute ./config.json
+bun run plugin/cli/src/cli.ts execute ./config.json
+
+# Run tests
+bun test
 
 # Or link globally for development
 bun link
@@ -312,7 +315,7 @@ bun unlink mizu
 
 ## Customizing Prompts
 
-The execute agent loads prompts from `src/agents/execute/prompts/`. Prompts support Jinja2-like templating:
+The execute agent loads prompts from `plugin/cli/src/agents/execute/prompts/`. Prompts support Jinja2-like templating:
 
 - `{{ variable }}` - Variable substitution
 - `{% if condition %}...{% endif %}` - Conditionals

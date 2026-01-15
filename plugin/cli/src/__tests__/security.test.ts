@@ -186,7 +186,7 @@ describe("Command Allowlists", () => {
     expect(DEV_COMMANDS.has("node")).toBe(true);
   });
 
-  test("getAllowedCommands includes all command types for builder", () => {
+  test("getAllowedCommands includes all command types for execute agent", () => {
     const allowed = getAllowedCommands("execute");
     expect(allowed.has("ls")).toBe(true);
     expect(allowed.has("npm")).toBe(true);
@@ -376,25 +376,18 @@ describe("Bash Command Validation", () => {
     });
   });
 
-  describe("Agent Type Support", () => {
-    test("validates for builder agent", () => {
-      const result = validateBashCommand("npm install", "execute");
-      expect(result.allowed).toBe(true);
+  describe("Execute Agent Commands", () => {
+    test("allows package manager commands", () => {
+      expect(validateBashCommand("npm install", "execute").allowed).toBe(true);
+      expect(validateBashCommand("pnpm typecheck", "execute").allowed).toBe(true);
     });
 
-    test("validates for migrator agent", () => {
-      const result = validateBashCommand("pnpm typecheck", "execute");
-      expect(result.allowed).toBe(true);
+    test("allows git commands", () => {
+      expect(validateBashCommand("git diff", "execute").allowed).toBe(true);
     });
 
-    test("validates for bugfix agent", () => {
-      const result = validateBashCommand("git diff", "execute");
-      expect(result.allowed).toBe(true);
-    });
-
-    test("validates for feature agent", () => {
-      const result = validateBashCommand("npm test", "execute");
-      expect(result.allowed).toBe(true);
+    test("allows test commands", () => {
+      expect(validateBashCommand("npm test", "execute").allowed).toBe(true);
     });
   });
 });
