@@ -55,11 +55,13 @@
   {
     "id": "task-006",
     "description": "Update src/core/longrunning.ts - remove unused imports (BuilderState, MigratorState, ScaffoldState)",
-    "status": "pending",
+    "status": "completed",
     "dependencies": [
       "task-005"
     ],
-    "verificationCommand": null
+    "verificationCommand": null,
+    "completedAt": "2026-01-15T08:23:19Z",
+    "notes": "Updated src/core/longrunning.ts to remove BuilderState, MigratorState, and ScaffoldState imports. Added ExecuteState import. Simplified printLongRunningCompletion function to only handle execute state type. Updated file header to specify 'Execute Agent Session Runner'. Updated resume instruction to 'mizu execute --resume <config.json>'."
   },
   {
     "id": "task-007",

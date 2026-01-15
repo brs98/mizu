@@ -1,13 +1,13 @@
 /**
- * Long-Running Agent Session Runner
+ * Long-Running Execute Agent Session Runner
  *
- * Provides the core loop for running agents across many sessions.
- * Unlike the basic session runner, this:
- * - Uses file-based state persistence
- * - Supports crash recovery
- * - Integrates MCP servers (Puppeteer)
- * - Uses OS-level sandbox
- * - Handles the two-agent pattern (initializer + coder)
+ * Provides the core loop for running the execute agent across many sessions.
+ * Features:
+ * - File-based state persistence
+ * - Crash recovery support
+ * - MCP server integration (Puppeteer)
+ * - OS-level sandbox
+ * - Multi-session task execution
  */
 
 import { query, type SettingSource, type CanUseTool } from "@anthropic-ai/claude-agent-sdk";
@@ -15,9 +15,7 @@ import { resolve } from "node:path";
 
 import type {
   ProjectState,
-  BuilderState,
-  MigratorState,
-  ScaffoldState,
+  ExecuteState,
 } from "./state";
 import type { AgentType } from "./permissions";
 import { createSecurePermissionCallback } from "./security";
@@ -385,25 +383,13 @@ export function printLongRunningCompletion(
   console.log(`Sessions: ${sessions}`);
   console.log(`Status: ${completed ? "Completed" : "Incomplete"}`);
 
-  if (state.type === "builder") {
-    const builderState = state as BuilderState;
-    const total = builderState.features.length;
-    const passing = builderState.features.filter((f) => f.passes).length;
-    console.log(`Features: ${passing}/${total} passing`);
-  } else if (state.type === "migrator") {
-    const migratorState = state as MigratorState;
-    const total = migratorState.files.length;
-    const migrated = migratorState.files.filter(
-      (f) => f.status === "migrated",
-    ).length;
-    console.log(`Files: ${migrated}/${total} migrated`);
-  } else if (state.type === "scaffold") {
-    const scaffoldState = state as ScaffoldState;
-    const total = scaffoldState.tasks.length;
-    const completed = scaffoldState.tasks.filter(
+  if (state.type === "execute") {
+    const executeState = state as ExecuteState;
+    const total = executeState.tasks.length;
+    const completedTasks = executeState.tasks.filter(
       (t) => t.status === "completed",
     ).length;
-    console.log(`Tasks: ${completed}/${total} completed`);
+    console.log(`Tasks: ${completedTasks}/${total} completed`);
   }
 
   console.log();
@@ -413,7 +399,7 @@ export function printLongRunningCompletion(
     console.log("-".repeat(70));
     console.log("  TO CONTINUE:");
     console.log("-".repeat(70));
-    console.log(`\n  ai-agent resume -p ${state.projectDir}`);
+    console.log(`\n  mizu execute --resume <config.json>`);
     console.log(
       "\n  Or run the same command again to pick up where you left off.",
     );
