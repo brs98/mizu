@@ -297,24 +297,6 @@ describe("getSettingsPreset", () => {
     expect(hasPuppeteer).toBe(true);
   });
 
-  test("builder preset has Puppeteer and acceptEdits", () => {
-    const settings = getSettingsPreset("builder", "/test");
-    expect(settings.permissions.defaultMode).toBe("acceptEdits");
-    const hasPuppeteer = settings.permissions.allow.some((p) =>
-      p.includes("puppeteer")
-    );
-    expect(hasPuppeteer).toBe(true);
-  });
-
-  test("migrator preset does not have Puppeteer", () => {
-    const settings = getSettingsPreset("migrator", "/test");
-    expect(settings.permissions.defaultMode).toBe("acceptEdits");
-    const hasPuppeteer = settings.permissions.allow.some((p) =>
-      p.includes("puppeteer")
-    );
-    expect(hasPuppeteer).toBe(false);
-  });
-
   test("presets merge additional options", () => {
     const settings = getSettingsPreset("quick", "/test", {
       additionalReadPaths: ["/extra"],

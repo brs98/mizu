@@ -177,7 +177,7 @@ export function createSettingsFile(options: GenerateSettingsOptions): string {
 // Settings Presets
 // =============================================================================
 
-export type SettingsPreset = "quick" | "standard" | "thorough" | "builder" | "migrator";
+export type SettingsPreset = "quick" | "standard" | "thorough";
 
 /**
  * Get settings for a preset configuration
@@ -215,22 +215,6 @@ export function getSettingsPreset(
         sandboxEnabled: true,
         permissionMode: "default",
         enablePuppeteer: true, // Enable browser testing for thorough mode
-      });
-
-    case "builder":
-      return generateSettings({
-        ...baseOptions,
-        sandboxEnabled: true,
-        permissionMode: "acceptEdits", // Fast edits for long-running tasks
-        enablePuppeteer: true, // Browser testing required for builders
-      });
-
-    case "migrator":
-      return generateSettings({
-        ...baseOptions,
-        sandboxEnabled: true,
-        permissionMode: "acceptEdits",
-        enablePuppeteer: false, // Migrators don't need browser testing
       });
 
     default:

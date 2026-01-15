@@ -19,15 +19,6 @@ export {
   getPromptsDir,
 } from "./prompts";
 
-// Basic session runner
-export {
-  type SessionConfig,
-  type SessionCallbacks,
-  runMultiSessionAgent,
-  printAgentHeader,
-  printCompletionSummary,
-} from "./session";
-
 // State management
 export {
   type LongRunningAgentType,

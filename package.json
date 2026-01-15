@@ -1,22 +1,19 @@
 {
-  "name": "ai-agents",
+  "name": "mizu",
   "version": "0.2.0",
-  "description": "Specialized AI agents for software engineering tasks - from quick fixes to full app development",
+  "description": "Claude Code plugin for creating dynamic AI agent harnesses and executing implementation plans",
   "type": "module",
-  "main": "src/cli.ts",
+  "main": "plugin/cli/src/cli.ts",
   "bin": {
-    "mizu": "src/cli.ts"
+    "mizu": "plugin/cli/src/cli.ts"
   },
   "scripts": {
-    "dev": "bun run src/cli.ts",
-    "bugfix": "bun run src/cli.ts bugfix",
-    "feature": "bun run src/cli.ts feature",
-    "refactor": "bun run src/cli.ts refactor",
-    "build": "bun run src/cli.ts build",
-    "resume": "bun run src/cli.ts resume",
-    "status": "bun run src/cli.ts status",
+    "dev": "bun run plugin/cli/src/cli.ts",
+    "execute": "bun run plugin/cli/src/cli.ts execute",
+    "status": "bun run plugin/cli/src/cli.ts status",
+    "test": "bun test",
     "typecheck": "bun x tsc --noEmit",
-    "lint": "bun x eslint src/"
+    "lint": "bun x eslint plugin/cli/src/"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.61",
