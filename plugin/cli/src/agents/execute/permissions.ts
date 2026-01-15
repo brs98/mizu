@@ -9,55 +9,13 @@
 
 import type { PermissionResult, CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 import type { ExecutionPermissions } from "../../core/state";
-import { extractCommands } from "../../core/security";
-
-// =============================================================================
-// Permission Presets
-// =============================================================================
-
-const READONLY_COMMANDS = new Set([
-  // File inspection
-  "ls", "cat", "head", "tail", "wc", "grep", "find", "tree",
-  // Directory navigation
-  "pwd", "cd",
-  // Utilities
-  "echo", "date", "which", "env",
-]);
-
-const DEV_COMMANDS = new Set([
-  // All readonly commands
-  ...READONLY_COMMANDS,
-  // File operations
-  "cp", "mv", "mkdir", "chmod", "touch", "rm",
-  // Node.js / Bun
-  "npm", "npx", "node", "yarn", "pnpm", "bun",
-  // Python
-  "python", "python3", "pip", "pip3", "poetry", "pytest", "mypy", "ruff", "black",
-  // General dev
-  "make", "cargo", "go", "ruby", "bundle",
-  // Version control
-  "git",
-  // Process management
-  "ps", "lsof", "sleep", "pkill", "kill",
-  // Network
-  "curl", "jq",
-  // Script execution
-  "bash", "sh",
-]);
-
-const FULL_COMMANDS = new Set([
-  ...DEV_COMMANDS,
-  // Docker
-  "docker", "docker-compose",
-  // Database
-  "psql", "mysql", "sqlite3", "redis-cli", "mongosh",
-  // Cloud
-  "aws", "gcloud", "az",
-  // Kubernetes
-  "kubectl", "helm",
-  // System
-  "sudo", "systemctl",
-]);
+import {
+  extractCommands,
+  BASE_ALLOWED_COMMANDS,
+  DEV_COMMANDS,
+  FULL_COMMANDS,
+  ALLOWED_KILL_TARGETS,
+} from "../../core/security";
 
 // =============================================================================
 // Keyword to Commands Mapping (for inference)
@@ -114,13 +72,13 @@ const DANGEROUS_PATTERNS = [
 function getPresetCommands(preset: ExecutionPermissions["preset"]): Set<string> {
   switch (preset) {
     case "readonly":
-      return new Set(READONLY_COMMANDS);
+      return new Set(BASE_ALLOWED_COMMANDS);
     case "dev":
-      return new Set(DEV_COMMANDS);
+      return new Set([...BASE_ALLOWED_COMMANDS, ...DEV_COMMANDS]);
     case "full":
       return new Set(FULL_COMMANDS);
     default:
-      return new Set(DEV_COMMANDS);
+      return new Set([...BASE_ALLOWED_COMMANDS, ...DEV_COMMANDS]);
   }
 }
 
@@ -168,14 +126,6 @@ export function mergePermissions(permissions: ExecutionPermissions): Set<string>
 // =============================================================================
 // Kill Command Validation
 // =============================================================================
-
-const ALLOWED_KILL_TARGETS = new Set([
-  "node", "npm", "npx", "yarn", "pnpm", "bun",
-  "python", "python3", "pytest",
-  "vite", "next", "webpack",
-  "flask", "uvicorn", "gunicorn",
-  "cargo", "go",
-]);
 
 function validateKillCommand(command: string): { allowed: boolean; message?: string } {
   const parts = command.split(/\s+/);

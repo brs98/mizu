@@ -11,7 +11,7 @@
  */
 
 import type { PermissionResult, CanUseTool } from "@anthropic-ai/claude-agent-sdk";
-import type { AgentType } from "./permissions";
+import type { AgentType } from "./state";
 
 // =============================================================================
 // Command Allowlists
@@ -107,6 +107,33 @@ const DEV_COMMANDS = new Set([
   // Init scripts (validated separately)
   "init.sh",
   "./init.sh",
+]);
+
+/**
+ * Full commands for unrestricted agent usage (use with caution)
+ */
+const FULL_COMMANDS = new Set([
+  ...BASE_ALLOWED_COMMANDS,
+  ...DEV_COMMANDS,
+  // Docker
+  "docker",
+  "docker-compose",
+  // Database
+  "psql",
+  "mysql",
+  "sqlite3",
+  "redis-cli",
+  "mongosh",
+  // Cloud
+  "aws",
+  "gcloud",
+  "az",
+  // Kubernetes
+  "kubectl",
+  "helm",
+  // System
+  "sudo",
+  "systemctl",
 ]);
 
 /**
@@ -656,4 +683,5 @@ export {
   ALLOWED_KILL_TARGETS,
   BASE_ALLOWED_COMMANDS,
   DEV_COMMANDS,
+  FULL_COMMANDS,
 };
