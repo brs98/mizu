@@ -26,6 +26,34 @@ Requires:
 - [Bun](https://bun.sh) runtime
 - [Claude Code](https://claude.ai/download) with an active subscription
 
+### Global Installation
+
+To make the `mizu` command available globally:
+
+```bash
+# From the project directory
+bun link
+```
+
+After linking, you can run mizu from anywhere:
+
+```bash
+# Instead of: bun run src/cli.ts execute ./config.json
+mizu execute ./config.json
+
+# Check status
+mizu status -p ./my-project
+
+# Get help
+mizu --help
+```
+
+To unlink:
+
+```bash
+bun unlink mizu
+```
+
 ## Quick Start
 
 ### 1. Create a Plan in Claude Code
@@ -54,17 +82,20 @@ This creates a file like `docs/plans/dark-mode.execution.json` with:
 ### 3. Execute the Plan
 
 ```bash
-# Start execution
+# Start execution (if mizu is linked globally)
+mizu execute ./docs/plans/dark-mode.execution.json
+
+# Or run directly with bun
 bun run src/cli.ts execute ./docs/plans/dark-mode.execution.json
 
 # Resume if interrupted
-bun run src/cli.ts execute --resume ./docs/plans/dark-mode.execution.json
+mizu execute --resume ./docs/plans/dark-mode.execution.json
 
 # Force restart
-bun run src/cli.ts execute --force ./docs/plans/dark-mode.execution.json
+mizu execute --force ./docs/plans/dark-mode.execution.json
 
 # Check progress
-bun run src/cli.ts status -p ./my-project
+mizu status -p ./my-project
 ```
 
 ## Commands
