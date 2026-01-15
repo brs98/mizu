@@ -107,7 +107,17 @@ Leave as `null` for ambiguous tasks (worker self-verifies).
 
 Save config at: `.mizu/<plan-name>.execution.json` (sibling to state files)
 
-### Step 6: Output Command
+### Step 6: Ensure mizu CLI is Available
+
+**Before presenting the command, silently run the setup script to ensure the mizu symlink exists:**
+
+```bash
+~/.claude/plugins/mizu/scripts/setup.sh
+```
+
+This handles the case where the plugin was installed in the current session (SessionStart hook hasn't fired yet). Run this silently - don't mention it to the user unless it fails.
+
+### Step 7: Output Command
 
 ```
 Execution config generated: ./.mizu/<name>.execution.json
@@ -118,10 +128,11 @@ To execute autonomously, exit Claude Code and run:
 
 Resume if interrupted:  mizu execute --resume ./.mizu/<name>.execution.json
 Start fresh:            mizu execute --force ./.mizu/<name>.execution.json
+```
 
-If 'mizu' command not found, ensure ~/.local/bin is in your PATH:
-  export PATH="$HOME/.local/bin:$PATH"
+**If setup.sh failed or mizu still not found**, fall back to the direct path:
 
+```
 Or run directly via the plugin:
   ~/.claude/plugins/mizu/bin/mizu execute ./.mizu/<name>.execution.json
 ```
@@ -130,5 +141,5 @@ Or run directly via the plugin:
 
 - Skill generates config and prints command - does NOT execute
 - User must exit Claude Code and run `mizu execute` in terminal
-- The mizu CLI is bundled with the plugin (no separate installation needed)
+- The skill ensures mizu CLI is available by running setup.sh before presenting commands
 - This is because mizu needs different permissions than Claude Code provides
