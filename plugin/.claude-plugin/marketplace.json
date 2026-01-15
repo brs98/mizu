@@ -1,0 +1,13 @@
+{
+  "name": "mizu-local",
+  "owner": {
+    "name": "Anthropic"
+  },
+  "plugins": [
+    {
+      "name": "mizu",
+      "source": "./",
+      "description": "Autonomous plan execution for Claude Code"
+    }
+  ]
+}
