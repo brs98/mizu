@@ -1,23 +1,20 @@
-# AI Agents
+# Mizu - Execute Agent for Plan Execution
 
-Specialized AI agents for software engineering tasks, powered by the [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk).
+Task execution agent powered by the [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk).
 
-## Agents
+## Overview
 
-All agents use a **two-phase pattern** with task-based state tracking:
-- **Session 1 (Initializer):** Analyzes inputs, creates a task list
-- **Sessions 2+ (Worker):** Executes one task per session until complete
+Mizu executes implementation plans created in Claude Code's plan mode. The workflow:
 
-This enables crash recovery, incremental progress, and verification at each step.
+1. **Create plan in Claude Code plan mode** - Analyze the task and design implementation steps
+2. **Run `/harness` skill** - Generate execution config with tasks and permissions
+3. **Run `mizu execute`** - Execute the plan task by task with state persistence
 
-| Agent | Description | Task File |
-|-------|-------------|-----------|
-| **bugfix** | Diagnose and fix bugs from error logs and stack traces | `bugfix_tasks.json` |
-| **feature** | Add new functionality to existing codebases | `feature_tasks.json` |
-| **refactor** | Improve code quality without changing behavior | `refactor_tasks.json` |
-| **build** | Build complete applications from specifications with browser testing | `feature_list.json` |
-| **migrate** | Migrate schemas across codebases (e.g., Zod to OpenAPI) | `migration_manifest.json` |
-| **scaffold** | Scaffold new packages/projects from PRDs with reference support | `scaffold_tasks.json` |
+This enables:
+- **Crash recovery** - Resume from any point
+- **Task-based tracking** - One task per session with verification
+- **Incremental progress** - See exactly what's done and what's next
+- **Git integration** - Track changes across sessions
 
 ## Installation
 
@@ -31,262 +28,219 @@ Requires:
 
 ## Quick Start
 
+### 1. Create a Plan in Claude Code
+
+Use Claude Code's plan mode to analyze your task and create a detailed implementation plan:
+
+```
+User: "Add dark mode support to the app"
+Claude: [Creates detailed plan with steps]
+```
+
+### 2. Generate Execution Config
+
+Run the `/harness` skill in Claude Code to convert the plan to an execution config:
+
+```
+User: /harness
+Claude: [Generates execution config JSON file]
+```
+
+This creates a file like `docs/plans/dark-mode.execution.json` with:
+- Task list with dependencies
+- Permission settings
+- Verification commands
+
+### 3. Execute the Plan
+
 ```bash
-# Bug fixing
-bun run src/cli.ts bugfix -p ./my-project -e "TypeError: Cannot read property 'x' of undefined"
+# Start execution
+bun run src/cli.ts execute ./docs/plans/dark-mode.execution.json
 
-# Feature implementation
-bun run src/cli.ts feature -p ./my-project -s "Add dark mode toggle"
+# Resume if interrupted
+bun run src/cli.ts execute --resume ./docs/plans/dark-mode.execution.json
 
-# Refactoring
-bun run src/cli.ts refactor -p ./my-project -t "src/api/" --focus performance
+# Force restart
+bun run src/cli.ts execute --force ./docs/plans/dark-mode.execution.json
 
-# Build complete application
-bun run src/cli.ts build -p ./new-app -f ./app-spec.md
-
-# Schema migration
-bun run src/cli.ts migrate -p ./migration -s src/schemas --swagger ./swagger.json
-
-# Project scaffolding
-bun run src/cli.ts scaffold -p ./packages/new-client -f ./prd.md -r ./packages/existing-client
-
-# Resume or check status of any agent
-bun run src/cli.ts resume -p ./my-project
+# Check progress
 bun run src/cli.ts status -p ./my-project
 ```
 
 ## Commands
 
-### bugfix
+### execute
 
-Diagnose and fix bugs from error logs. Uses TDD approach: reproduce bug → write failing test → implement fix → verify.
+Execute a plan from an execution config file.
 
 ```bash
-# From error message
-bun run src/cli.ts bugfix -p ./my-project -e "TypeError: Cannot read property 'x' of undefined"
+# Execute plan
+bun run src/cli.ts execute <config.json>
 
-# From error log file
-bun run src/cli.ts bugfix -p ./my-project -f ./error.log
+# Resume interrupted execution
+bun run src/cli.ts execute --resume <config.json>
+
+# Force restart (overwrite existing state)
+bun run src/cli.ts execute --force <config.json>
+
+# Override model
+bun run src/cli.ts execute <config.json> -m claude-opus-4
 
 # Limit sessions
-bun run src/cli.ts bugfix -p ./my-project -e "error" --max-sessions 5
+bun run src/cli.ts execute <config.json> --max-sessions 10
 ```
 
 **How it works:**
-1. **Session 1:** Analyzes error, creates `bugfix_tasks.json` with diagnostic and fix steps
-2. **Sessions 2+:** Executes one task per session (reproduce, identify cause, write test, fix, verify)
+1. **Session 1:** Loads config, initializes state, begins first task
+2. **Sessions 2+:** Executes one task per session, verifies completion, moves to next
+3. **Completion:** All tasks done, final verification runs
 
 **Options:**
-- `-p, --project <path>` - Project directory (required)
-- `-e, --error <text>` - Error message or stack trace
-- `-f, --error-file <path>` - Path to error log file
-- `--max-sessions <n>` - Maximum sessions (default: unlimited)
-- `-m, --model <name>` - Claude model (default: claude-sonnet-4-5)
-
-### feature
-
-Add new functionality to existing codebases. Uses TDD approach: write tests first → implement → verify.
-
-```bash
-# From description
-bun run src/cli.ts feature -p ./my-project -s "Add user authentication with JWT"
-
-# From spec file
-bun run src/cli.ts feature -p ./my-project -f ./feature-spec.md
-```
-
-**How it works:**
-1. **Session 1:** Analyzes spec and codebase, creates `feature_tasks.json` with implementation steps
-2. **Sessions 2+:** Executes one task per session (analyze, design, implement, test, integrate)
-
-**Options:**
-- `-p, --project <path>` - Project directory (required)
-- `-s, --spec <text>` - Feature specification text
-- `-f, --spec-file <path>` - Path to specification file
-- `--max-sessions <n>` - Maximum sessions (default: unlimited)
-- `-m, --model <name>` - Claude model (default: claude-sonnet-4-5)
-
-### refactor
-
-Improve code quality without changing behavior.
-
-```bash
-# Refactor for performance
-bun run src/cli.ts refactor -p ./my-project -t "src/api/" --focus performance
-
-# Refactor for readability
-bun run src/cli.ts refactor -p ./my-project -t "src/utils/" --focus readability
-```
-
-**How it works:**
-1. **Session 1:** Analyzes target code, creates `refactor_tasks.json` with improvement tasks
-2. **Sessions 2+:** Executes one refactoring task per session, verifying behavior is preserved
-
-**Options:**
-- `-p, --project <path>` - Project directory (required)
-- `-t, --target <path>` - Target path/pattern to refactor
-- `--focus <area>` - performance, readability, patterns, all (default: all)
-- `--max-sessions <n>` - Maximum sessions (default: unlimited)
-- `-m, --model <name>` - Claude model (default: claude-sonnet-4-5)
-
-### build
-
-Build complete applications from specifications.
-
-```bash
-# Start a new build
-bun run src/cli.ts build -p ./new-app -f ./app-spec.md
-
-# With custom feature count
-bun run src/cli.ts build -p ./new-app -f ./spec.md --min-features 50 --max-features 100
-```
-
-**How it works:**
-1. **Session 1 (Initializer):** Reads spec, creates `feature_list.json` with 100-200 test cases
-2. **Session 2+ (Coder):** Implements one feature per session, verifies with browser testing
-3. **Completion:** All features passing, creates PR
-
-**Options:**
-- `-p, --project <path>` - Project directory (required)
-- `-s, --spec <text>` - Specification text
-- `-f, --spec-file <path>` - Path to specification file
-- `--min-features <n>` - Minimum features to generate (default: 100)
-- `--max-features <n>` - Maximum features to generate (default: 200)
+- `--resume` - Resume interrupted execution
+- `--force` - Force restart, overwriting existing state
+- `-m, --model <name>` - Claude model (overrides config)
 - `--max-sessions <n>` - Maximum sessions to run
-- `-m, --model <name>` - Claude model (default: claude-sonnet-4-5)
-
-### migrate
-
-Migrate schemas across codebases with dependency-aware ordering.
-
-```bash
-# Migrate Zod schemas to OpenAPI types
-bun run src/cli.ts migrate -p ./migration-state -s src/schemas --swagger ./swagger.json
-
-# With target directory for reference
-bun run src/cli.ts migrate -p ./migration -s src/schemas -t src/backend --type zod-to-openapi
-```
-
-**How it works:**
-1. **Session 1 (Initializer):** Scans codebase, builds dependency graph, creates `migration_manifest.json`
-2. **Session 2+ (Migrator):** Migrates one file per session, respects dependencies, verifies typecheck
-3. **Completion:** All files migrated, creates PR
-
-**Options:**
-- `-p, --project <path>` - Project/state directory (required)
-- `-s, --source <path>` - Source directory to scan (required)
-- `-t, --target <path>` - Target directory for reference
-- `--type <type>` - Migration type (default: zod-to-openapi)
-- `--swagger <path>` - Path to OpenAPI/Swagger spec
-- `--max-sessions <n>` - Maximum sessions to run
-- `-m, --model <name>` - Claude model (default: claude-sonnet-4-5)
-
-### scaffold
-
-Scaffold new packages or projects from specifications.
-
-```bash
-# Scaffold from PRD with reference implementation
-bun run src/cli.ts scaffold -p ./packages/new-api-client -f ./prd.md -r ./packages/existing-client
-
-# With additional read paths (cross-repo access)
-bun run src/cli.ts scaffold -p ./my-package -f ./spec.md --read-paths "/path/to/backend,/path/to/shared"
-
-# With custom verification commands
-bun run src/cli.ts scaffold -p ./my-package -f ./spec.md --verify "pnpm typecheck,pnpm build,pnpm test"
-```
-
-**How it works:**
-1. **Session 1 (Initializer):** Reads spec, studies reference, creates `scaffold_tasks.json` with 15-30 tasks
-2. **Session 2+ (Worker):** Executes one task per session, verifies with commands, commits progress
-3. **Completion:** All tasks done, runs final verification, creates PR
-
-**Options:**
-- `-p, --project <path>` - Project directory (required)
-- `-s, --spec <text>` - Specification text
-- `-f, --spec-file <path>` - Path to specification file (e.g., PRD)
-- `-r, --reference <path>` - Reference directory to copy patterns from
-- `--read-paths <paths>` - Additional directories to read (comma-separated)
-- `--verify <commands>` - Verification commands (default: pnpm typecheck,pnpm build)
-- `--max-sessions <n>` - Maximum sessions to run
-- `-m, --model <name>` - Claude model (default: claude-sonnet-4-5)
-
-### resume
-
-Resume any agent from saved state.
-
-```bash
-bun run src/cli.ts resume -p ./my-project
-```
 
 ### status
 
-Check progress of any agent task.
+Check progress of plan execution.
 
 ```bash
 # Human-readable output
 bun run src/cli.ts status -p ./my-project
 
-# JSON output
+# JSON output (for scripting)
 bun run src/cli.ts status -p ./my-project --json
 ```
+
+Shows:
+- Current task
+- Tasks completed
+- Session count
+- Recent progress notes
+
+## Execution Config Format
+
+The `/harness` skill generates execution configs. Example structure:
+
+```json
+{
+  "version": "1.0",
+  "planFile": "./docs/plans/feature.plan.md",
+  "projectDir": "./my-project",
+  "model": "claude-sonnet-4-5",
+  "tasks": [
+    {
+      "id": "task-001",
+      "description": "Update component with dark mode support",
+      "status": "pending",
+      "dependencies": [],
+      "verificationCommand": "npm test"
+    }
+  ],
+  "permissions": {
+    "preset": "dev",
+    "allow": [],
+    "deny": []
+  }
+}
+```
+
+## State Files
+
+Execution creates state files in the project directory:
+
+| File | Purpose |
+|------|---------|
+| `.ai-agent-state.json` | Core state (type, session count, status) |
+| `execute_tasks.json` | Task list with completion status |
+| `claude-progress.txt` | Human-readable session notes |
 
 ## Project Structure
 
 ```
-ai-agents/
+mizu/
 ├── src/
 │   ├── cli.ts                      # CLI entry point
 │   ├── core/
-│   │   ├── longrunning.ts          # Multi-session agent runner
+│   │   ├── longrunning.ts          # Multi-session execution runner
 │   │   ├── state.ts                # Persistent state management
-│   │   ├── security.ts             # Command validation and security
+│   │   ├── security.ts             # Command validation
 │   │   ├── sandbox.ts              # OS-level sandbox configuration
 │   │   ├── mcp.ts                  # MCP server configuration
 │   │   ├── permissions.ts          # Tool permission controls
 │   │   └── prompts.ts              # Prompt template loading
 │   └── agents/
-│       ├── bugfix/                 # Bug diagnosis and fixing
-│       ├── feature/                # Feature implementation
-│       ├── refactor/               # Code quality improvement
-│       ├── builder/                # Complete app building
-│       ├── migrator/               # Schema migration
-│       └── scaffold/               # Package scaffolding
+│       └── execute/                # Execute agent implementation
 ├── package.json
 └── tsconfig.json
 ```
 
-## State Files
+## Security
 
-All agents create state files in the project directory for crash recovery:
+Defense-in-depth security model:
 
-| File | Agent | Purpose |
-|------|-------|---------|
-| `.ai-agent-state.json` | All | Core state (type, session count, status) |
-| `bugfix_tasks.json` | bugfix | Diagnostic and fix tasks |
-| `feature_tasks.json` | feature | Feature implementation tasks |
-| `refactor_tasks.json` | refactor | Refactoring improvement tasks |
-| `feature_list.json` | build | Test cases with pass/fail status |
-| `migration_manifest.json` | migrate | Files with migration status and dependencies |
-| `scaffold_tasks.json` | scaffold | Scaffolding tasks with completion status |
-| `claude-progress.txt` | All | Human-readable session notes |
+- **OS-level sandbox** via `.claude_settings.json`
+- **Command allowlist** - Only approved bash commands
+- **Dangerous pattern blocking** - Prevents `rm -rf /`, fork bombs, etc.
+- **Process restrictions** - `pkill`/`kill` limited to dev processes
+- **Fine-grained permissions** - Via SDK's `canUseTool` callback
+
+Permission presets:
+- `readonly` - Read-only operations
+- `dev` - Full development commands (default)
+- `full` - All commands (use with caution)
+
+## Examples
+
+### Feature Implementation
+
+```bash
+# In Claude Code:
+User: "Add user authentication with JWT"
+User: /harness
+
+# In terminal:
+bun run src/cli.ts execute ./docs/plans/auth-feature.execution.json
+```
+
+### Bug Fix
+
+```bash
+# In Claude Code:
+User: "Fix TypeError in user profile component"
+User: /harness
+
+# In terminal:
+bun run src/cli.ts execute ./docs/plans/bugfix.execution.json
+```
+
+### Refactoring
+
+```bash
+# In Claude Code:
+User: "Refactor API client for better error handling"
+User: /harness
+
+# In terminal:
+bun run src/cli.ts execute ./docs/plans/refactor.execution.json
+```
 
 ## Customizing Prompts
 
-Each agent loads prompts from markdown files in its `prompts/` directory. Prompts support templating:
+The execute agent loads prompts from `src/agents/execute/prompts/`. Prompts support Jinja2-like templating:
 
 - `{{ variable }}` - Variable substitution
-- `{% if var == "value" %}...{% endif %}` - Conditionals
+- `{% if condition %}...{% endif %}` - Conditionals
+- `{% for item in items %}...{% endfor %}` - Loops
 
-## Security
+## Workflow Tips
 
-Agents use defense-in-depth security:
-
-- OS-level sandbox via `.claude_settings.json`
-- Bash command allowlist with proper shell parsing
-- Blocks dangerous patterns (`rm -rf /`, fork bombs, etc.)
-- Restricts `pkill`/`kill` to development processes
-- Fine-grained tool permissions via SDK's `canUseTool`
+1. **Start with detailed plans** - Better plans = better execution
+2. **Use verification commands** - Catch issues early
+3. **Check status frequently** - Monitor progress between sessions
+4. **Resume on interruption** - State persistence handles crashes
+5. **Review progress notes** - `claude-progress.txt` tracks all changes
 
 ## License
 

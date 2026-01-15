@@ -226,3 +226,53 @@ This was a documentation-focused task. Since AgentType is now only "execute", th
 [2026-01-15T08:22:27.443Z]
 Session 5 completed. Tasks: 5/9 completed.
 Task task-005: I'll start by orienting myself and then execute task-005.Good! Tasks 1-4 are completed. Now I need to work on task-005: updating `src/core/permissions.ts` to simplify it since only the execute type exists. Let me first read the file to understand its structure:Good! I can see the file structure. The `getAllowedCommands` function (lines 62-69) can be simplified since `AgentType` is now only `"execute"`. The function currently doesn't do any type-specific logic anyway - it just adds DEV_COMMANDS to all agent types. I can simplify this function and potentially the documentation. Let me update the file:Good! Now let me also update the file header comment to reflect that this is specifically for the execute agent:Perfect! Now let me verify the file looks correct by reading the key sections:Excellent! The function is now simplified and the comment is updated. Now let me update the task status:Now I'll commit the progress:Now I'll document this in the progress file:Perfect! Let me verify the progress file was updated:Excellent! Task-005 is now complete. Let me provide a summary:; ## Task-005 Completed Successfully ✓; - Updated `src/core/permissions.ts` to clarify that it's specifically for the execute agent
+
+=== Session 6: 2026-01-15T08:23:19Z ===
+
+## Task Completed: task-006
+
+### Description
+Update src/core/longrunning.ts - remove unused imports (BuilderState, MigratorState, ScaffoldState)
+
+### Implementation
+Updated the long-running agent session runner to remove references to deleted agent types:
+
+**Removed Imports:**
+- BuilderState
+- MigratorState
+- ScaffoldState
+
+**Added Imports:**
+- ExecuteState
+
+**Updated Functions:**
+- `printLongRunningCompletion`: Removed type-specific branches for builder, migrator, and scaffold
+- Simplified to only handle execute state type
+- Shows tasks completed count for execute agent
+- Updated resume instruction from "ai-agent resume -p" to "mizu execute --resume <config.json>"
+
+**Updated Header:**
+- Changed from "Long-Running Agent Session Runner" to "Long-Running Execute Agent Session Runner"
+- Updated description to specify it runs "the execute agent" instead of generic "agents"
+- Clarified features list
+
+### Verification
+- All imports now reference only execute-related types
+- printLongRunningCompletion function simplified and focused on execute agent
+- File maintains backward compatibility with existing execute agent code
+- Resume instructions match new CLI structure
+
+### Git Commit
+- Commit: 2229910
+- Message: "execute: task-006 - Remove unused state imports from src/core/longrunning.ts"
+- Files changed: 4 files, 70 insertions, 38 deletions
+
+### Status
+✓ Task completed successfully
+✓ Long-running module fully updated for execute agent only
+✓ Ready for next task (task-007)
+
+
+[2026-01-15T08:24:01.239Z]
+Session 6 completed. Tasks: 6/9 completed.
+Task task-006: I'll start by orienting myself and then execute task-006.Good! Tasks 1-5 are completed. Now I need to work on task-006: updating `src/core/longrunning.ts` to remove unused imports. Let me first read the file to understand its structure:Perfect! I can see that the file imports `BuilderState`, `MigratorState`, and `ScaffoldState` on lines 16-21, and they're used in the `printLongRunningCompletion` function (lines 388-407). Since these types no longer exist in state.ts, I need to remove these imports and simplify the completion function. Let me update the file:Good! Now I need to update the `printLongRunningCompletion` function to remove the type-specific logic for builder, migrator, and scaffold, and simplify it for the execute agent:Perfect! Now let me also update the file header comment to reflect that this is for the execute agent:Excellent! Now let me verify the changes look correct:Perfect! Now let me update the task status:Now I'll commit the progress:Now I'll document this in the progress file:Perfect! Let me verify the progress file was updated:Excellent! Task-006 is now complete. Let me provide a summary:; ## Task-006 Completed Successfully ✓; - Updated `src/core/longrunning.ts` to remove imports for the 3 deleted agent state types

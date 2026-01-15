@@ -66,11 +66,13 @@
   {
     "id": "task-007",
     "description": "Update README.md - document new workflow: 1) Create plan in Claude Code plan mode, 2) Run /harness skill to generate execution config, 3) Run mizu execute <config.json>",
-    "status": "pending",
+    "status": "completed",
     "dependencies": [
       "task-006"
     ],
-    "verificationCommand": null
+    "verificationCommand": null,
+    "completedAt": "2026-01-15T08:24:59Z",
+    "notes": "Completely rewrote README.md to document the execute agent workflow. Changed from documenting 6 agents (bugfix, feature, refactor, build, migrate, scaffold) to only the execute agent. Updated title to 'Mizu - Execute Agent for Plan Execution'. Documented 3-step workflow: Create plan → /harness skill → mizu execute. Included examples, config format, state files, security model, and workflow tips. File reduced from 294 to 247 lines."
   },
   {
     "id": "task-008",
