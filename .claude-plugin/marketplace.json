@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "mizu",
-      "source": "./plugin",
+      "source": "../plugin",
       "description": "Autonomous plan execution for Claude Code"
     }
   ]
