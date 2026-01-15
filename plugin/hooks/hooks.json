@@ -1,3 +1,10 @@
 {
-  "hooks": {}
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "test -d ${CLAUDE_PLUGIN_ROOT}/cli/node_modules || bun install --cwd ${CLAUDE_PLUGIN_ROOT}/cli --silent"
+      }
+    ]
+  }
 }
