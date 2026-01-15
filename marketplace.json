@@ -1,0 +1,13 @@
+{
+  "name": "mizu",
+  "owner": {
+    "name": "brs98"
+  },
+  "plugins": [
+    {
+      "name": "mizu",
+      "source": "./plugin",
+      "description": "Autonomous plan execution for Claude Code"
+    }
+  ]
+}
