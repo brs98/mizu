@@ -1,8 +1,8 @@
 /**
  * Permission Controls
  *
- * Security controls for agent tool usage.
- * Replaces the Python security.py with the SDK's canUseTool callback pattern.
+ * Security controls for execute agent tool usage.
+ * Implements the SDK's canUseTool callback pattern with command allowlists and dangerous pattern blocking.
  */
 
 import type { PermissionResult, CanUseTool } from "@anthropic-ai/claude-agent-sdk";
@@ -62,7 +62,7 @@ const ALLOWED_KILL_TARGETS = new Set([
 function getAllowedCommands(agentType: AgentType): Set<string> {
   const commands = new Set(BASE_ALLOWED_COMMANDS);
 
-  // All agent types get dev commands
+  // Execute agent gets full dev commands
   DEV_COMMANDS.forEach(cmd => commands.add(cmd));
 
   return commands;

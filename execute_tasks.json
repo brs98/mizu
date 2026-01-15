@@ -44,11 +44,13 @@
   {
     "id": "task-005",
     "description": "Update src/core/permissions.ts - simplify getAllowedCommands since only execute type exists",
-    "status": "pending",
+    "status": "completed",
     "dependencies": [
       "task-004"
     ],
-    "verificationCommand": null
+    "verificationCommand": null,
+    "completedAt": "2026-01-15T08:21:47Z",
+    "notes": "Updated src/core/permissions.ts to simplify getAllowedCommands function comment from 'All agent types' to 'Execute agent'. Updated file header to specify 'execute agent tool usage' instead of generic 'agent tool usage'. Since AgentType is now only 'execute', the function logic remains the same but the documentation is more accurate."
   },
   {
     "id": "task-006",
