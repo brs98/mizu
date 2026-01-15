@@ -1,12 +1,13 @@
 /**
  * Core Infrastructure
  *
- * Shared components for all specialized AI agents.
+ * Shared components for the execute agent.
  */
 
-// Basic permissions
+// Permissions
 export {
   createPermissionCallback,
+  type AgentType,
 } from "./permissions";
 
 // Prompt utilities
@@ -18,7 +19,7 @@ export {
   getPromptsDir,
 } from "./prompts";
 
-// Basic session runner (for quick agents)
+// Basic session runner
 export {
   type SessionConfig,
   type SessionCallbacks,
@@ -27,81 +28,37 @@ export {
   printCompletionSummary,
 } from "./session";
 
-// State management (for all agents)
+// State management
 export {
-  type AgentType,
   type LongRunningAgentType,
   type ProjectState,
-  type BuilderState,
-  type MigratorState,
-  type ScaffoldState,
-  type ScaffoldTask,
-  type ScaffoldTaskStatus,
-  type BugfixState,
-  type FeatureState,
-  type RefactorState,
-  type RefactorFocus,
+  type ExecuteState,
+  type ExecutionPermissions,
+  type ExecutionConfig,
   type AgentTask,
   type AgentTaskStatus,
-  type FeatureTest,
-  type FeatureCategory,
-  type MigrationFile,
-  type MigrationFileStatus,
+  type BaseState,
   hasExistingState,
   detectStateType,
   isInitialized,
   loadState,
-  loadBuilderState,
-  loadMigratorState,
-  loadScaffoldState,
-  loadBugfixState,
-  loadFeatureState,
-  loadRefactorState,
-  createBuilderState,
-  createMigratorState,
-  createScaffoldState,
-  createBugfixState,
-  createFeatureState,
-  createRefactorState,
+  loadExecuteState,
+  createExecuteState,
   saveState,
-  loadFeatureList,
-  saveFeatureList,
-  syncFeaturesFromFile,
-  getNextFailingFeature,
-  getFeatureProgress,
-  loadMigrationManifest,
-  saveMigrationManifest,
-  syncManifestFromFile,
-  getNextPendingFile,
-  getMigrationProgress,
-  loadScaffoldTasks,
-  saveScaffoldTasks,
-  syncTasksFromFile,
+  loadExecuteTasks,
+  saveExecuteTasks,
+  getExecuteTasksPath,
+  syncExecuteTasksFromFile,
   getNextPendingTask,
-  getScaffoldProgress,
-  loadBugfixTasks,
-  saveBugfixTasks,
-  syncBugfixTasksFromFile,
-  getBugfixProgress,
-  loadFeatureTasks,
-  saveFeatureTasks,
-  syncFeatureTasksFromFile,
-  getFeatureTaskProgress,
-  loadRefactorTasks,
-  saveRefactorTasks,
-  syncRefactorTasksFromFile,
-  getRefactorProgress,
+  getExecuteProgress,
   appendProgress,
   readProgress,
+  getProgressFilePath,
   incrementSession,
   markInitialized,
+  addRecentSummary,
   isComplete,
-  printBuilderProgress,
-  printMigratorProgress,
-  printScaffoldProgress,
-  printBugfixProgress,
-  printFeatureProgress,
-  printRefactorProgress,
+  printExecuteProgress,
   printProgress,
 } from "./state";
 
@@ -151,6 +108,8 @@ export {
 export {
   type LongRunningConfig,
   type LongRunningResult,
+  type LongRunningHeaderOptions,
+  type LongRunningCompletionOptions,
   runLongRunningAgent,
   printLongRunningHeader,
   printLongRunningCompletion,

@@ -276,3 +276,65 @@ Updated the long-running agent session runner to remove references to deleted ag
 [2026-01-15T08:24:01.239Z]
 Session 6 completed. Tasks: 6/9 completed.
 Task task-006: I'll start by orienting myself and then execute task-006.Good! Tasks 1-5 are completed. Now I need to work on task-006: updating `src/core/longrunning.ts` to remove unused imports. Let me first read the file to understand its structure:Perfect! I can see that the file imports `BuilderState`, `MigratorState`, and `ScaffoldState` on lines 16-21, and they're used in the `printLongRunningCompletion` function (lines 388-407). Since these types no longer exist in state.ts, I need to remove these imports and simplify the completion function. Let me update the file:Good! Now I need to update the `printLongRunningCompletion` function to remove the type-specific logic for builder, migrator, and scaffold, and simplify it for the execute agent:Perfect! Now let me also update the file header comment to reflect that this is for the execute agent:Excellent! Now let me verify the changes look correct:Perfect! Now let me update the task status:Now I'll commit the progress:Now I'll document this in the progress file:Perfect! Let me verify the progress file was updated:Excellent! Task-006 is now complete. Let me provide a summary:; ## Task-006 Completed Successfully ✓; - Updated `src/core/longrunning.ts` to remove imports for the 3 deleted agent state types
+
+=== Session 7: 2026-01-15T08:24:59Z ===
+
+## Task Completed: task-007
+
+### Description
+Update README.md - document new workflow: 1) Create plan in Claude Code plan mode, 2) Run /harness skill to generate execution config, 3) Run mizu execute <config.json>
+
+### Implementation
+Completely rewrote README.md to focus on the execute agent and new workflow:
+
+**Old Structure (294 lines):**
+- Documented 6 agents: bugfix, feature, refactor, build, migrate, scaffold
+- Detailed command documentation for each agent
+- State file documentation for all agents
+- Project structure showing all agent directories
+
+**New Structure (247 lines):**
+- Title: "Mizu - Execute Agent for Plan Execution"
+- Overview: 3-step workflow (Claude Code plan mode → /harness skill → mizu execute)
+- Quick Start guide with practical examples
+- Commands: execute and status only
+- Execution config format documentation
+- State files: only execute-related
+- Project structure: only execute agent
+- Security model documentation
+- Examples for common scenarios (feature, bugfix, refactor)
+- Workflow tips
+
+**Key Sections:**
+1. Overview - Explains the workflow and benefits
+2. Installation - Requirements and setup
+3. Quick Start - Step-by-step guide
+4. Commands - execute and status documentation
+5. Execution Config Format - JSON structure explanation
+6. State Files - What gets created
+7. Project Structure - Simplified to execute only
+8. Security - Defense-in-depth approach
+9. Examples - Real-world usage scenarios
+10. Workflow Tips - Best practices
+
+### Verification
+- README now accurately reflects the execute-only architecture
+- 3-step workflow clearly documented
+- All examples use new command structure
+- No references to removed agents
+- State file documentation matches current implementation
+
+### Git Commit
+- Commit: 8850fe3
+- Message: "execute: task-007 - Rewrite README.md to document execute agent workflow"
+- Files changed: 4 files, 221 insertions, 213 deletions
+
+### Status
+✓ Task completed successfully
+✓ Documentation fully updated
+✓ Ready for next task (task-008)
+
+
+[2026-01-15T08:25:44.620Z]
+Session 7 completed. Tasks: 7/9 completed.
+Task task-007: I'll start by orienting myself and then execute task-007.Good! Tasks 1-6 are completed. Now I need to work on task-007: updating README.md to document the new workflow. Let me first read the current README to understand what needs to be changed:Perfect! I can see the README is quite comprehensive and documents all the old agents. I need to completely rewrite it to document the new workflow with just the execute agent. Let me create a new, focused README:Perfect! The README has been completely rewritten. Let me verify the file looks correct:Great! The README went from 294 lines to 247 lines, and is now focused entirely on the execute agent workflow. Now let me update the task status:Now I'll commit the progress:Now I'll document this in the progress file:Perfect! Let me verify the progress file was updated:Excellent! Task-007 is now complete. Let me provide a summary:; ## Task-007 Completed Successfully ✓; - Task-001: ✓ Completed

@@ -351,6 +351,15 @@ export function markInitialized(state: ProjectState): ProjectState {
   };
 }
 
+export function addRecentSummary(state: ExecuteState, summary: string): ExecuteState {
+  const summaries = [...state.recentSummaries, summary].slice(-3); // Keep last 3
+  return {
+    ...state,
+    recentSummaries: summaries,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 // =============================================================================
 // Progress Display
 // =============================================================================

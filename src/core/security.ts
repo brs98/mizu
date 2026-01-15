@@ -632,8 +632,8 @@ export async function bashSecurityHook(
     return {};
   }
 
-  // Use "builder" as default agent type for hooks
-  const result = validateBashCommand(command, "builder");
+  // Use "execute" as default agent type for hooks
+  const result = validateBashCommand(command, "execute");
   if (!result.allowed) {
     return {
       decision: "block",
