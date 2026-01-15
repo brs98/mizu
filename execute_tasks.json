@@ -88,10 +88,12 @@
   {
     "id": "task-009",
     "description": "Test that mizu execute --help works correctly",
-    "status": "pending",
+    "status": "completed",
     "dependencies": [
       "task-008"
     ],
-    "verificationCommand": "mizu execute --help"
+    "verificationCommand": "mizu execute --help",
+    "completedAt": "2026-01-15T08:29:08Z",
+    "notes": "Verified that mizu execute --help works correctly and displays proper help text. Also tested mizu --help and mizu status --help. All commands work as expected: only execute and status commands are shown, no references to deleted agents (bugfix, feature, refactor, build, migrate, scaffold), help text matches new workflow documentation."
   }
 ]
