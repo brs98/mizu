@@ -11,7 +11,7 @@
  *   3. Run: mizu execute <config.json>
  *
  * Commands:
- *   mizu execute ./docs/plans/feature.execution.json
+ *   mizu execute ./.mizu/feature.execution.json
  *   mizu status --project ./my-app
  */
 
@@ -126,8 +126,8 @@ program
 
       printProgress(state);
 
-      // Show claude-progress.txt if it exists
-      const progressFile = resolve(projectDir, "claude-progress.txt");
+      // Show progress.txt if it exists
+      const progressFile = resolve(projectDir, ".mizu", "progress.txt");
       if (existsSync(progressFile)) {
         const progressContent = readFileSync(progressFile, "utf-8");
         const lastLines = progressContent.split("\n").slice(-20).join("\n");
@@ -149,9 +149,9 @@ Examples:
   # Workflow: Create plan in Claude Code → /harness skill → mizu execute
 
   # Execute a plan
-  $ mizu execute ./docs/plans/feature.execution.json
-  $ mizu execute --resume ./docs/plans/feature.execution.json
-  $ mizu execute --force ./docs/plans/feature.execution.json
+  $ mizu execute ./.mizu/feature.execution.json
+  $ mizu execute --resume ./.mizu/feature.execution.json
+  $ mizu execute --force ./.mizu/feature.execution.json
 
   # Check progress
   $ mizu status -p ./my-app

@@ -27,7 +27,5 @@ Thumbs.db
 # Lock files (optional - remove if you want to track)
 bun.lock
 
-# Mizu execution state files (generated during plan execution)
-.ai-agent-state.json
-execute_tasks.json
-claude-progress.txt
+# Mizu execution state (generated during plan execution)
+.mizu/

@@ -76,7 +76,7 @@ User: /harness
 Claude: [Generates execution config JSON file]
 ```
 
-This creates a file like `docs/plans/dark-mode.execution.json` with:
+This creates a file like `.mizu/dark-mode.execution.json` with:
 - Task list with dependencies
 - Permission settings
 - Verification commands
@@ -86,17 +86,17 @@ This creates a file like `docs/plans/dark-mode.execution.json` with:
 Exit Claude Code and run:
 
 ```bash
-mizu execute ./docs/plans/dark-mode.execution.json
+mizu execute ./.mizu/dark-mode.execution.json
 ```
 
 Other commands:
 
 ```bash
 # Resume if interrupted
-mizu execute --resume ./docs/plans/dark-mode.execution.json
+mizu execute --resume ./.mizu/dark-mode.execution.json
 
 # Force restart
-mizu execute --force ./docs/plans/dark-mode.execution.json
+mizu execute --force ./.mizu/dark-mode.execution.json
 
 # Check progress
 mizu status -p ./my-project
@@ -185,7 +185,7 @@ The `/harness` skill generates execution configs. Example structure:
 ```json
 {
   "version": "1.0",
-  "planFile": "./docs/plans/feature.plan.md",
+  "planFile": "./.mizu/plans/feature.plan.md",
   "projectDir": "./my-project",
   "model": "claude-sonnet-4-5",
   "tasks": [
@@ -207,13 +207,14 @@ The `/harness` skill generates execution configs. Example structure:
 
 ## State Files
 
-Execution creates state files in the project directory:
+Execution creates state files in `.mizu/` directory (gitignored):
 
 | File | Purpose |
 |------|---------|
-| `.ai-agent-state.json` | Core state (type, session count, status) |
-| `execute_tasks.json` | Task list with completion status |
-| `claude-progress.txt` | Human-readable session notes |
+| `.mizu/state.json` | Core state (type, session count, status) |
+| `.mizu/tasks.json` | Task list with completion status |
+| `.mizu/progress.txt` | Human-readable session notes |
+| `.mizu/*.execution.json` | Execution configs from /harness |
 
 ## Project Structure
 
@@ -264,7 +265,7 @@ User: "Add user authentication with JWT"
 User: /harness
 
 # In terminal:
-mizu execute ./docs/plans/auth-feature.execution.json
+mizu execute ./.mizu/auth-feature.execution.json
 ```
 
 ### Bug Fix
@@ -275,7 +276,7 @@ User: "Fix TypeError in user profile component"
 User: /harness
 
 # In terminal:
-mizu execute ./docs/plans/bugfix.execution.json
+mizu execute ./.mizu/bugfix.execution.json
 ```
 
 ### Refactoring
@@ -286,7 +287,7 @@ User: "Refactor API client for better error handling"
 User: /harness
 
 # In terminal:
-mizu execute ./docs/plans/refactor.execution.json
+mizu execute ./.mizu/refactor.execution.json
 ```
 
 ## Development Setup

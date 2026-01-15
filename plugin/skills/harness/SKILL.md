@@ -11,7 +11,7 @@ Transform a Claude Code plan into an execution config for `mizu execute`.
 
 ```
 /harness                                    # Auto-detect recent plans
-/harness ./docs/plans/2024-01-15-feature.md # Specific plan file
+/harness ./.mizu/plans/2024-01-15-feature.md # Specific plan file
 ```
 
 ## Workflow
@@ -20,7 +20,7 @@ Transform a Claude Code plan into an execution config for `mizu execute`.
 
 **With argument:** Use that file directly.
 
-**Without argument:** Scan `docs/plans/` for `.md` files. If multiple, use AskUserQuestion to let user choose.
+**Without argument:** Scan `.mizu/plans/` for `.md` files. If multiple, use AskUserQuestion to let user choose.
 
 ### Step 2: Extract Tasks
 
@@ -105,25 +105,25 @@ Leave as `null` for ambiguous tasks (worker self-verifies).
 - Tasks have ONLY: `id`, `description`, `status`, `dependencies`, `verificationCommand`, `completedAt` (optional)
 - `permissions.inferred`: Bash command names like `["docker", "psql"]`, NOT Claude tool names
 
-Save config at: `<plan-path>.execution.json`
+Save config at: `.mizu/<plan-name>.execution.json` (sibling to state files)
 
 ### Step 6: Output Command
 
 ```
-Execution config generated: ./docs/plans/<name>.execution.json
+Execution config generated: ./.mizu/<name>.execution.json
 
 To execute autonomously, exit Claude Code and run:
 
-  mizu execute ./docs/plans/<name>.execution.json
+  mizu execute ./.mizu/<name>.execution.json
 
-Resume if interrupted:  mizu execute --resume ./path/to/config.json
-Start fresh:            mizu execute --force ./path/to/config.json
+Resume if interrupted:  mizu execute --resume ./.mizu/<name>.execution.json
+Start fresh:            mizu execute --force ./.mizu/<name>.execution.json
 
 If 'mizu' command not found, ensure ~/.local/bin is in your PATH:
   export PATH="$HOME/.local/bin:$PATH"
 
 Or run directly via the plugin:
-  ~/.claude/plugins/mizu/bin/mizu execute ./path/to/config.json
+  ~/.claude/plugins/mizu/bin/mizu execute ./.mizu/<name>.execution.json
 ```
 
 ## Important

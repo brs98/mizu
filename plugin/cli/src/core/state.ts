@@ -4,10 +4,11 @@
  * File-based state persistence for the execute agent.
  * Enables crash recovery, session continuity, and progress tracking.
  *
- * Key files:
- * - .ai-agent-state.json: Core state (type, session count, initialized)
- * - execute_tasks.json: Task list for execute agent
- * - claude-progress.txt: Human-readable progress notes
+ * All state files are stored in .mizu/ directory:
+ * - .mizu/state.json: Core state (type, session count, initialized)
+ * - .mizu/tasks.json: Task list for execute agent
+ * - .mizu/progress.txt: Human-readable progress notes
+ * - .mizu/*.execution.json: Execution configs from /harness
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -96,20 +97,62 @@ export type ProjectState = ExecuteState;
 // File Paths
 // =============================================================================
 
-const STATE_FILE = ".ai-agent-state.json";
-const EXECUTE_TASKS_FILE = "execute_tasks.json";
-const PROGRESS_FILE = "claude-progress.txt";
+const MIZU_DIR = ".mizu";
+const STATE_FILE = "state.json";
+const EXECUTE_TASKS_FILE = "tasks.json";
+const PROGRESS_FILE = "progress.txt";
+
+export function getMizuDir(projectDir: string): string {
+  return join(projectDir, MIZU_DIR);
+}
 
 export function getStateFilePath(projectDir: string): string {
-  return join(projectDir, STATE_FILE);
+  return join(getMizuDir(projectDir), STATE_FILE);
 }
 
 export function getExecuteTasksPath(projectDir: string): string {
-  return join(projectDir, EXECUTE_TASKS_FILE);
+  return join(getMizuDir(projectDir), EXECUTE_TASKS_FILE);
 }
 
 export function getProgressFilePath(projectDir: string): string {
-  return join(projectDir, PROGRESS_FILE);
+  return join(getMizuDir(projectDir), PROGRESS_FILE);
+}
+
+/**
+ * Ensure .mizu/ is in .gitignore
+ * Adds it if not present, creates .gitignore if it doesn't exist
+ */
+function ensureGitignore(projectDir: string): void {
+  const gitignorePath = join(projectDir, ".gitignore");
+  const mizuPattern = ".mizu/";
+
+  if (existsSync(gitignorePath)) {
+    const content = readFileSync(gitignorePath, "utf-8");
+    // Check for .mizu/ or .mizu (with or without trailing slash)
+    if (content.includes(".mizu")) {
+      return; // Already has .mizu entry
+    }
+    // Append .mizu/ to existing .gitignore
+    const newContent = content.endsWith("\n")
+      ? `${content}# Mizu execution state\n${mizuPattern}\n`
+      : `${content}\n\n# Mizu execution state\n${mizuPattern}\n`;
+    writeFileSync(gitignorePath, newContent);
+  } else {
+    // Create new .gitignore with .mizu/
+    writeFileSync(gitignorePath, `# Mizu execution state\n${mizuPattern}\n`);
+  }
+}
+
+/**
+ * Ensure the .mizu directory exists and is gitignored
+ */
+export function ensureMizuDir(projectDir: string): void {
+  const mizuDir = getMizuDir(projectDir);
+  if (!existsSync(mizuDir)) {
+    mkdirSync(mizuDir, { recursive: true });
+    // Only update .gitignore when first creating .mizu/
+    ensureGitignore(projectDir);
+  }
 }
 
 // =============================================================================
@@ -257,6 +300,7 @@ export function loadExecuteTasks(projectDir: string): AgentTask[] {
 }
 
 export function saveExecuteTasks(projectDir: string, tasks: AgentTask[]): void {
+  ensureMizuDir(projectDir);
   const tasksPath = getExecuteTasksPath(projectDir);
   writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
 }
@@ -311,6 +355,7 @@ export function getExecuteProgress(tasks: AgentTask[]): {
 // =============================================================================
 
 export function appendProgress(projectDir: string, message: string): void {
+  ensureMizuDir(projectDir);
   const progressPath = getProgressFilePath(projectDir);
   const timestamp = new Date().toISOString();
   const entry = `\n[${timestamp}]\n${message}\n`;
