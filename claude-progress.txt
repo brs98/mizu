@@ -571,3 +571,70 @@ Task task-002: Added harness skill to plugin successfully.
 [2026-01-15T20:00:50.553Z]
 Session 2 completed. Tasks: 2/6 completed.
 Task task-002: I'll start by orienting myself and then execute task-002.Good! Task-001 is complete. Now I need to execute task-002: copying the harness skill from `/Users/brandon/.claude/skills/harness/SKILL.md` to `plugin/skills/harness/SKILL.md` and updating any plugin-specific references. Let me first check if the source file exists and read it:Perfect! I've read the source skill file. Now let me check if the destination directory exists and create the skill file:Good! The harness directory already exists. Let me check if there's already a SKILL.md file there:The directory is empty. Now I'll copy the skill file. According to the plan, I should copy it and update any plugin-specific references. Looking at the content, I don't see any absolute paths or references that need to be changed - the skill is already self-contained and uses relative paths. I'll copy it as-is:Perfect! Now let me verify the file was created correctly and check if any references need updating:Excellent! The skill file has been copied successfully. After reviewing the content, I can confirm that no plugin-specific references need to be updated - the skill is self-contained and uses relative paths that work from any location. The skill correctly references `mizu execute` commands and follows the proper format.; Now let me update the task status in execute_tasks.json:Perfect! Now let me commit the progress:Excellent! Now let me document this in the progress file:Perfect! Now let me verify the progress file was updated:Excellent! Task-002 has been completed successfully. Let me provide a summary:; ## Task-002 Completed Successfully ✓
+
+=== Session 12: 2026-01-15T20:01:00Z ===
+
+## Task Completed: task-003
+
+### Description
+Create auto-install hook: plugin/hooks/hooks.json with SessionStart hook, and plugin/scripts/install-mizu.sh that checks for and installs mizu CLI
+
+### Implementation
+Successfully created the auto-install hook system for the mizu CLI:
+
+**File 1: `plugin/hooks/hooks.json`**
+- Configured SessionStart hook to run on each Claude Code session
+- Hook executes the install script using ${CLAUDE_PLUGIN_ROOT} variable
+- JSON structure follows Claude Code plugin hook specification
+
+**File 2: `plugin/scripts/install-mizu.sh`**
+- Bash script that checks if mizu CLI is installed
+- Attempts installation via npm first, falls back to bun
+- Graceful error handling with warning message if both fail
+- Made executable with chmod +x (755 permissions)
+- Exits with 0 status to avoid blocking session start
+
+**Hook Behavior:**
+1. Runs automatically when Claude Code session starts with plugin loaded
+2. Checks for `mizu` command availability
+3. If not found, attempts `npm install -g @anthropic-ai/mizu-agent`
+4. Falls back to `bun install -g @anthropic-ai/mizu-agent` if npm fails
+5. Shows warning if both installation methods fail
+6. Always exits successfully to not interrupt Claude Code
+
+**Key Features:**
+- Non-blocking: Quick check if mizu already installed
+- Dual package manager support: npm and bun
+- Silent operation: Suppresses error output (2>/dev/null)
+- User-friendly: Provides manual installation instructions on failure
+
+### Verification
+✓ plugin/hooks/hooks.json created with correct JSON structure
+✓ SessionStart hook configured with correct command path
+✓ Uses ${CLAUDE_PLUGIN_ROOT} variable for portability
+✓ plugin/scripts/install-mizu.sh created with proper bash syntax
+✓ Script made executable (chmod +x verified)
+✓ Script checks for mizu command before installing
+✓ Fallback chain: npm → bun → warning message
+✓ Script always exits with 0 for non-blocking behavior
+
+### Git Commit
+- Commit: fff37de
+- Message: "execute: task-003 - Create auto-install hook for mizu CLI"
+- Files changed: 5 files, 98 insertions, 8 deletions
+- New files: plugin/hooks/hooks.json (executable: no), plugin/scripts/install-mizu.sh (executable: yes)
+
+### Status
+✓ Task completed successfully
+✓ Auto-install hook ready for plugin use
+✓ Mizu CLI will be auto-installed on first session start
+✓ Ready for next task (task-004)
+
+
+[2026-01-15T20:01:00Z]
+Session 12 completed. Tasks: 3/6 completed.
+Task task-003: Created auto-install hook system successfully.
+
+[2026-01-15T20:02:11.095Z]
+Session 3 completed. Tasks: 3/6 completed.
+Task task-003: I'll start by orienting myself and then execute task-003.Good! Tasks 1 and 2 are completed. Now I need to execute task-003: creating the auto-install hook with `plugin/hooks/hooks.json` and `plugin/scripts/install-mizu.sh`. Let me check the current structure of these directories:Both directories appear to be empty. Now I'll create the two required files according to the plan. Let me start with the hooks.json file:Perfect! Now let me create the install-mizu.sh script:Excellent! Now I need to make the shell script executable:Perfect! Now let me verify both files were created correctly:Excellent! Both files have been created correctly:; Now let me update the task status in execute_tasks.json:Perfect! Now let me commit the progress:Excellent! Now let me document this in the progress file:Perfect! Now let me verify the progress file was updated:Excellent! Task-003 has been completed successfully. Let me provide a summary:; ## Task-003 Completed Successfully ✓

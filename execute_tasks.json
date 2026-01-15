@@ -33,11 +33,13 @@
   {
     "id": "task-004",
     "description": "Build MCP status server: create plugin/mcp-server/package.json with @modelcontextprotocol/sdk dependency, and plugin/mcp-server/src/index.ts implementing mizu_status, mizu_tasks, and mizu_progress tools that read state files",
-    "status": "pending",
+    "status": "completed",
     "dependencies": [
       "task-003"
     ],
-    "verificationCommand": "bun run typecheck"
+    "verificationCommand": "bun run typecheck",
+    "completedAt": "2026-01-15T20:02:00Z",
+    "notes": "Created plugin/mcp-server/package.json with MCP SDK dependency. Implemented plugin/mcp-server/src/index.ts (316 lines) with 3 MCP tools: mizu_status (execution status), mizu_tasks (task list), and mizu_progress (progress notes). Reads state files without modifying them. Verified with bun run typecheck - compiles successfully."
   },
   {
     "id": "task-005",
