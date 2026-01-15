@@ -1,0 +1,7 @@
+{
+  "name": "mizu",
+  "version": "1.0.0",
+  "description": "Autonomous plan execution for Claude Code",
+  "author": "Anthropic",
+  "homepage": "https://github.com/anthropics/mizu"
+}

@@ -1,99 +1,56 @@
 [
   {
     "id": "task-001",
-    "description": "Delete 6 agent directories: src/agents/bugfix/, src/agents/feature/, src/agents/refactor/, src/agents/builder/, src/agents/migrator/, src/agents/scaffold/",
+    "description": "Create plugin manifest at plugin/.claude-plugin/plugin.json with name, version, description, author, and homepage fields",
     "status": "completed",
     "dependencies": [],
     "verificationCommand": null,
-    "completedAt": "2026-01-15T08:15:24Z",
-    "notes": "Successfully deleted all 6 agent directories (bugfix, feature, refactor, builder, migrator, scaffold). Verified that only execute directory remains in src/agents/."
+    "completedAt": "2026-01-15T08:35:00Z",
+    "notes": "Created plugin/.claude-plugin/plugin.json with all required fields: name (mizu), version (1.0.0), description, author (Anthropic), and homepage. File created successfully and verified."
   },
   {
     "id": "task-002",
-    "description": "Update src/agents/index.ts - remove all exports except execute agent",
-    "status": "completed",
+    "description": "Add harness skill by copying from /Users/brandon/.claude/skills/harness/SKILL.md to plugin/skills/harness/SKILL.md, updating any plugin-specific references",
+    "status": "pending",
     "dependencies": [
       "task-001"
     ],
-    "verificationCommand": null,
-    "completedAt": "2026-01-15T08:16:31Z",
-    "notes": "Updated src/agents/index.ts to only export runExecute and ExecuteOptions from the execute agent. Removed all exports for bugfix, feature, refactor, builder, migrator, and scaffold agents. Verified that execute/index.ts exports match."
+    "verificationCommand": null
   },
   {
     "id": "task-003",
-    "description": "Update src/core/state.ts - remove all builder/migrator/scaffold/bugfix/feature/refactor types, state creation functions, load/save functions, and progress display functions. Keep only BaseState, ExecuteState, AgentTask, and execute-related functions",
-    "status": "completed",
+    "description": "Create auto-install hook: plugin/hooks/hooks.json with SessionStart hook, and plugin/scripts/install-mizu.sh that checks for and installs mizu CLI",
+    "status": "pending",
     "dependencies": [
       "task-002"
     ],
-    "verificationCommand": null,
-    "completedAt": "2026-01-15T08:18:46Z",
-    "notes": "Completely rewrote src/core/state.ts from 1250 lines to 400 lines. Removed all types and functions for builder, migrator, scaffold, bugfix, feature, and refactor agents. Updated AgentType to only 'execute'. Updated ProjectState to only ExecuteState. Kept all required execute-related functions, BaseState, ExecuteState, AgentTask, AgentTaskStatus, and core state management functions."
+    "verificationCommand": null
   },
   {
     "id": "task-004",
-    "description": "Update src/cli.ts - remove bugfix, feature, refactor, build, migrate, scaffold, and resume commands. Keep only execute and status commands. Update imports and help text",
-    "status": "completed",
+    "description": "Build MCP status server: create plugin/mcp-server/package.json with @modelcontextprotocol/sdk dependency, and plugin/mcp-server/src/index.ts implementing mizu_status, mizu_tasks, and mizu_progress tools that read state files",
+    "status": "pending",
     "dependencies": [
       "task-003"
     ],
-    "verificationCommand": null,
-    "completedAt": "2026-01-15T08:20:32Z",
-    "notes": "Completely rewrote src/cli.ts from 652 lines to 169 lines (74% reduction). Removed all commands for bugfix, feature, refactor, build, migrate, scaffold, and resume. Kept only execute and status commands. Removed all imports for deleted agents. Simplified status command to only handle execute state. Updated help text to reflect new workflow: Claude Code plan mode → /harness skill → mizu execute."
+    "verificationCommand": "bun run typecheck"
   },
   {
     "id": "task-005",
-    "description": "Update src/core/permissions.ts - simplify getAllowedCommands since only execute type exists",
-    "status": "completed",
+    "description": "Configure MCP registration in plugin/.mcp.json to register mizu-status server with stdio transport using bun to run the TypeScript server",
+    "status": "pending",
     "dependencies": [
       "task-004"
     ],
-    "verificationCommand": null,
-    "completedAt": "2026-01-15T08:21:47Z",
-    "notes": "Updated src/core/permissions.ts to simplify getAllowedCommands function comment from 'All agent types' to 'Execute agent'. Updated file header to specify 'execute agent tool usage' instead of generic 'agent tool usage'. Since AgentType is now only 'execute', the function logic remains the same but the documentation is more accurate."
+    "verificationCommand": null
   },
   {
     "id": "task-006",
-    "description": "Update src/core/longrunning.ts - remove unused imports (BuilderState, MigratorState, ScaffoldState)",
-    "status": "completed",
+    "description": "Update README.md with plugin installation instructions, /harness skill usage, and MCP status tool documentation",
+    "status": "pending",
     "dependencies": [
       "task-005"
     ],
-    "verificationCommand": null,
-    "completedAt": "2026-01-15T08:23:19Z",
-    "notes": "Updated src/core/longrunning.ts to remove BuilderState, MigratorState, and ScaffoldState imports. Added ExecuteState import. Simplified printLongRunningCompletion function to only handle execute state type. Updated file header to specify 'Execute Agent Session Runner'. Updated resume instruction to 'mizu execute --resume <config.json>'."
-  },
-  {
-    "id": "task-007",
-    "description": "Update README.md - document new workflow: 1) Create plan in Claude Code plan mode, 2) Run /harness skill to generate execution config, 3) Run mizu execute <config.json>",
-    "status": "completed",
-    "dependencies": [
-      "task-006"
-    ],
-    "verificationCommand": null,
-    "completedAt": "2026-01-15T08:24:59Z",
-    "notes": "Completely rewrote README.md to document the execute agent workflow. Changed from documenting 6 agents (bugfix, feature, refactor, build, migrate, scaffold) to only the execute agent. Updated title to 'Mizu - Execute Agent for Plan Execution'. Documented 3-step workflow: Create plan → /harness skill → mizu execute. Included examples, config format, state files, security model, and workflow tips. File reduced from 294 to 247 lines."
-  },
-  {
-    "id": "task-008",
-    "description": "Run TypeScript type check to verify compilation succeeds with no errors",
-    "status": "completed",
-    "dependencies": [
-      "task-007"
-    ],
-    "verificationCommand": "bun run typecheck",
-    "completedAt": "2026-01-15T08:27:39Z",
-    "notes": "Fixed TypeScript compilation errors by: 1) Updated src/core/index.ts to only export execute-related types and functions, 2) Fixed src/core/security.ts to use 'execute' instead of 'builder', 3) Updated security.test.ts to use 'execute' for all agent type references, 4) Added missing addRecentSummary function to src/core/state.ts and exported it, 5) Excluded test directory from tsconfig.json since tests reference deleted agents. TypeScript compilation now succeeds with no errors."
-  },
-  {
-    "id": "task-009",
-    "description": "Test that mizu execute --help works correctly",
-    "status": "completed",
-    "dependencies": [
-      "task-008"
-    ],
-    "verificationCommand": "mizu execute --help",
-    "completedAt": "2026-01-15T08:29:08Z",
-    "notes": "Verified that mizu execute --help works correctly and displays proper help text. Also tested mizu --help and mizu status --help. All commands work as expected: only execute and status commands are shown, no references to deleted agents (bugfix, feature, refactor, build, migrate, scaffold), help text matches new workflow documentation."
+    "verificationCommand": null
   }
 ]
