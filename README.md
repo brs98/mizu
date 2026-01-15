@@ -234,7 +234,8 @@ Execution creates state files in `.mizu/` directory (gitignored):
 
 ```
 mizu/
-├── marketplace.json                # GitHub marketplace manifest
+├── .claude-plugin/                 # GitHub marketplace manifest
+│   └── marketplace.json
 ├── plugin/                         # Claude Code plugin
 │   ├── .claude-plugin/             # Plugin manifest
 │   ├── bin/mizu                    # Shell wrapper
