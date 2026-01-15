@@ -3,14 +3,14 @@
   "version": "0.2.0",
   "description": "Claude Code plugin for creating dynamic AI agent harnesses and executing implementation plans",
   "type": "module",
-  "main": "plugin/cli/src/cli.ts",
+  "main": "plugin/cli/src/mizu.ts",
   "bin": {
-    "mizu": "plugin/cli/src/cli.ts"
+    "mizu": "plugin/cli/src/mizu.ts"
   },
   "scripts": {
-    "dev": "bun run plugin/cli/src/cli.ts",
-    "execute": "bun run plugin/cli/src/cli.ts execute",
-    "status": "bun run plugin/cli/src/cli.ts status",
+    "dev": "bun run plugin/cli/src/mizu.ts",
+    "execute": "bun run plugin/cli/src/mizu.ts execute",
+    "status": "bun run plugin/cli/src/mizu.ts status",
     "test": "bun test",
     "typecheck": "bun x tsc --noEmit",
     "lint": "bun x eslint plugin/cli/src/"

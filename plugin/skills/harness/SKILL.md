@@ -107,39 +107,30 @@ Leave as `null` for ambiguous tasks (worker self-verifies).
 
 Save config at: `.mizu/<plan-name>.execution.json` (sibling to state files)
 
-### Step 6: Ensure mizu CLI is Available
+### Step 6: Output Command
 
-**Before presenting the command, silently run the setup script to ensure the mizu symlink exists:**
+**Derive the plugin root from your base directory** (shown in the skill header). Remove the `/skills/harness` suffix to get the plugin root.
 
-```bash
-~/.claude/plugins/mizu/scripts/setup.sh
-```
+Example: If base directory is `/Users/x/.claude/plugins/cache/mizu/mizu/1.0.0/skills/harness`, then:
+- Plugin root: `/Users/x/.claude/plugins/cache/mizu/mizu/1.0.0`
+- CLI path: `<plugin-root>/cli/src/mizu.ts`
 
-This handles the case where the plugin was installed in the current session (SessionStart hook hasn't fired yet). Run this silently - don't mention it to the user unless it fails.
-
-### Step 7: Output Command
-
+**Output format:**
 ```
 Execution config generated: ./.mizu/<name>.execution.json
 
 To execute autonomously, exit Claude Code and run:
 
-  mizu execute ./.mizu/<name>.execution.json
+  bun run <plugin-root>/cli/src/mizu.ts execute ./.mizu/<name>.execution.json
 
-Resume if interrupted:  mizu execute --resume ./.mizu/<name>.execution.json
-Start fresh:            mizu execute --force ./.mizu/<name>.execution.json
+Resume if interrupted:  bun run <plugin-root>/cli/src/mizu.ts execute --resume ./.mizu/<name>.execution.json
+Start fresh:            bun run <plugin-root>/cli/src/mizu.ts execute --force ./.mizu/<name>.execution.json
 ```
 
-**If setup.sh failed or mizu still not found**, fall back to the direct path:
-
-```
-Or run directly via the plugin:
-  ~/.claude/plugins/mizu/bin/mizu execute ./.mizu/<name>.execution.json
-```
+Replace `<plugin-root>` with the actual absolute path derived from your base directory.
 
 ## Important
 
 - Skill generates config and prints command - does NOT execute
-- User must exit Claude Code and run `mizu execute` in terminal
-- The skill ensures mizu CLI is available by running setup.sh before presenting commands
+- User must exit Claude Code and run the command in terminal
 - This is because mizu needs different permissions than Claude Code provides
