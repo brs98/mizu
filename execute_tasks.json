@@ -33,11 +33,13 @@
   {
     "id": "task-004",
     "description": "Update src/cli.ts - remove bugfix, feature, refactor, build, migrate, scaffold, and resume commands. Keep only execute and status commands. Update imports and help text",
-    "status": "pending",
+    "status": "completed",
     "dependencies": [
       "task-003"
     ],
-    "verificationCommand": null
+    "verificationCommand": null,
+    "completedAt": "2026-01-15T08:20:32Z",
+    "notes": "Completely rewrote src/cli.ts from 652 lines to 169 lines (74% reduction). Removed all commands for bugfix, feature, refactor, build, migrate, scaffold, and resume. Kept only execute and status commands. Removed all imports for deleted agents. Simplified status command to only handle execute state. Updated help text to reflect new workflow: Claude Code plan mode → /harness skill → mizu execute."
   },
   {
     "id": "task-005",
