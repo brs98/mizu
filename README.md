@@ -18,55 +18,18 @@ This enables:
 
 ## Installation
 
-```bash
-bun install
-```
+The mizu plugin bundles everything you need - no separate CLI installation required.
 
-Requires:
+### Requirements
+
 - [Bun](https://bun.sh) runtime
 - [Claude Code](https://claude.ai/download) with an active subscription
-
-### Global Installation
-
-To make the `mizu` command available globally:
-
-```bash
-# From the project directory
-bun link
-```
-
-After linking, you can run mizu from anywhere:
-
-```bash
-# Instead of: bun run src/cli.ts execute ./config.json
-mizu execute ./config.json
-
-# Check status
-mizu status -p ./my-project
-
-# Get help
-mizu --help
-```
-
-To unlink:
-
-```bash
-bun unlink mizu
-```
-
-## Claude Code Plugin (Recommended)
-
-The mizu plugin bundles everything you need - no separate CLI installation required:
-- **`/harness` skill** - Generate execution configs directly from plans
-- **Bundled CLI** - The `mizu` command is included in the plugin
-- **Auto-setup** - Automatically configures the `mizu` command on first use
-- **Status tools** - Check execution status via natural language
 
 ### Plugin Installation
 
 ```bash
-# Add the plugin marketplace
-/plugin marketplace add /path/to/ai-agents/plugin
+# In Claude Code, add the plugin marketplace
+/plugin marketplace add /path/to/mizu/plugin
 
 # Install the plugin
 /plugin install mizu
@@ -76,48 +39,22 @@ On your first Claude Code session after installing, the plugin will:
 1. Create a symlink to `~/.local/bin/mizu`
 2. Add `~/.local/bin` to your PATH (for that session)
 
-After installation, `mizu` is available from anywhere:
+The plugin includes:
+- **`/harness` skill** - Generate execution configs directly from plans
+- **Bundled CLI** - The `mizu` command is included in the plugin
+- **Status tools** - Check execution status via MCP tools
+
+### Verify Installation
 
 ```bash
-mizu execute ./config.json
-mizu status -p ./my-project
+mizu --help
 ```
 
-### Using the /harness Skill
+If `mizu` is not found, ensure `~/.local/bin` is in your PATH:
 
-The `/harness` skill converts Claude Code plans into mizu execution configs:
-
+```bash
+export PATH="$HOME/.local/bin:$PATH"
 ```
-# In Claude Code, after creating a plan:
-User: /harness
-
-# Or specify a plan file:
-User: /harness ./docs/plans/my-feature.md
-```
-
-The skill will:
-1. Extract tasks from the plan
-2. Infer permissions based on plan content
-3. Suggest verification commands for each task
-4. Generate an execution config JSON file
-5. Show you the command to run mizu
-
-### Checking Execution Status
-
-With the plugin installed, you can check mizu execution status using natural language in Claude Code:
-
-```
-User: "What's the mizu status for this project?"
-User: "Show me the mizu tasks"
-User: "What's the recent mizu progress?"
-```
-
-The plugin provides three MCP tools:
-- **mizu_status** - Current execution status and progress
-- **mizu_tasks** - Complete task list with status
-- **mizu_progress** - Recent progress notes
-
-These tools read state files without modifying them, so you can safely query status at any time.
 
 ## Quick Start
 
@@ -146,13 +83,15 @@ This creates a file like `docs/plans/dark-mode.execution.json` with:
 
 ### 3. Execute the Plan
 
+Exit Claude Code and run:
+
 ```bash
-# Start execution (if mizu is linked globally)
 mizu execute ./docs/plans/dark-mode.execution.json
+```
 
-# Or run directly with bun
-bun run src/cli.ts execute ./docs/plans/dark-mode.execution.json
+Other commands:
 
+```bash
 # Resume if interrupted
 mizu execute --resume ./docs/plans/dark-mode.execution.json
 
@@ -163,6 +102,42 @@ mizu execute --force ./docs/plans/dark-mode.execution.json
 mizu status -p ./my-project
 ```
 
+## Using the /harness Skill
+
+The `/harness` skill converts Claude Code plans into mizu execution configs:
+
+```
+# Auto-detect recent plans
+/harness
+
+# Or specify a plan file
+/harness ./docs/plans/my-feature.md
+```
+
+The skill will:
+1. Extract tasks from the plan
+2. Infer permissions based on plan content
+3. Suggest verification commands for each task
+4. Generate an execution config JSON file
+5. Show you the command to run mizu
+
+## Checking Execution Status
+
+With the plugin installed, you can check mizu execution status using natural language in Claude Code:
+
+```
+User: "What's the mizu status for this project?"
+User: "Show me the mizu tasks"
+User: "What's the recent mizu progress?"
+```
+
+The plugin provides three MCP tools:
+- **mizu_status** - Current execution status and progress
+- **mizu_tasks** - Complete task list with status
+- **mizu_progress** - Recent progress notes
+
+These tools read state files without modifying them, so you can safely query status at any time.
+
 ## Commands
 
 ### execute
@@ -170,20 +145,11 @@ mizu status -p ./my-project
 Execute a plan from an execution config file.
 
 ```bash
-# Execute plan
 mizu execute <config.json>
-
-# Resume interrupted execution
-mizu execute --resume <config.json>
-
-# Force restart (overwrite existing state)
-mizu execute --force <config.json>
-
-# Override model
-mizu execute <config.json> -m claude-opus-4
-
-# Limit sessions
-mizu execute <config.json> --max-sessions 10
+mizu execute --resume <config.json>    # Resume interrupted execution
+mizu execute --force <config.json>     # Force restart
+mizu execute <config.json> -m claude-opus-4  # Override model
+mizu execute <config.json> --max-sessions 10  # Limit sessions
 ```
 
 **How it works:**
@@ -202,11 +168,8 @@ mizu execute <config.json> --max-sessions 10
 Check progress of plan execution.
 
 ```bash
-# Human-readable output
-mizu status -p ./my-project
-
-# JSON output (for scripting)
-mizu status -p ./my-project --json
+mizu status -p ./my-project           # Human-readable output
+mizu status -p ./my-project --json    # JSON output (for scripting)
 ```
 
 Shows:
@@ -256,18 +219,22 @@ Execution creates state files in the project directory:
 
 ```
 mizu/
-├── src/
+├── plugin/                         # Claude Code plugin (recommended)
+│   ├── .claude-plugin/             # Plugin manifest
+│   ├── bin/mizu                    # Shell wrapper
+│   ├── cli/                        # Bundled CLI source
+│   ├── hooks/                      # SessionStart setup hook
+│   ├── mcp-server/                 # Status checking MCP tools
+│   ├── scripts/setup.sh            # PATH configuration
+│   └── skills/harness/             # /harness skill
+├── src/                            # CLI source (also in plugin/cli/)
 │   ├── cli.ts                      # CLI entry point
-│   ├── core/
+│   ├── core/                       # Shared infrastructure
 │   │   ├── longrunning.ts          # Multi-session execution runner
 │   │   ├── state.ts                # Persistent state management
 │   │   ├── security.ts             # Command validation
-│   │   ├── sandbox.ts              # OS-level sandbox configuration
-│   │   ├── mcp.ts                  # MCP server configuration
-│   │   ├── permissions.ts          # Tool permission controls
-│   │   └── prompts.ts              # Prompt template loading
-│   └── agents/
-│       └── execute/                # Execute agent implementation
+│   │   └── ...
+│   └── agents/execute/             # Execute agent implementation
 ├── package.json
 └── tsconfig.json
 ```
@@ -320,6 +287,27 @@ User: /harness
 
 # In terminal:
 mizu execute ./docs/plans/refactor.execution.json
+```
+
+## Development Setup
+
+For contributors working on mizu itself:
+
+```bash
+# Clone and install dependencies
+git clone https://github.com/anthropics/mizu.git
+cd mizu
+bun install
+
+# Run directly
+bun run src/cli.ts execute ./config.json
+
+# Or link globally for development
+bun link
+mizu execute ./config.json
+
+# Unlink when done
+bun unlink mizu
 ```
 
 ## Customizing Prompts
