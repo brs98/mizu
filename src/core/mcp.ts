@@ -64,6 +64,7 @@ export const BUILTIN_TOOLS = [
   "Bash",
   "Task",
   "TodoWrite",
+  "Skill",
 ] as const;
 
 export type BuiltinTool = (typeof BUILTIN_TOOLS)[number];

@@ -111,7 +111,7 @@ function createQueryOptions(config: ClientConfig) {
     allowedTools,
     mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
     maxTurns: MAX_TURNS_PER_SESSION,
-    settingSources: ["project", "local"] as SettingSource[],
+    settingSources: ["user", "project"] as SettingSource[],
   };
 }
 
