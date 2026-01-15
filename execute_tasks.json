@@ -11,11 +11,13 @@
   {
     "id": "task-002",
     "description": "Update src/agents/index.ts - remove all exports except execute agent",
-    "status": "pending",
+    "status": "completed",
     "dependencies": [
       "task-001"
     ],
-    "verificationCommand": null
+    "verificationCommand": null,
+    "completedAt": "2026-01-15T08:16:31Z",
+    "notes": "Updated src/agents/index.ts to only export runExecute and ExecuteOptions from the execute agent. Removed all exports for bugfix, feature, refactor, builder, migrator, and scaffold agents. Verified that execute/index.ts exports match."
   },
   {
     "id": "task-003",

@@ -1,0 +1,107 @@
+{
+  "version": "1.0.0",
+  "type": "execute",
+  "initialized": true,
+  "sessionCount": 1,
+  "createdAt": "2026-01-15T08:14:57.420Z",
+  "updatedAt": "2026-01-15T08:15:52.017Z",
+  "model": "claude-sonnet-4-5",
+  "projectDir": "/Users/brandon/work/ai-agents",
+  "configFile": "/Users/brandon/.claude/plans/playful-wiggling-sprout.md.execution.json",
+  "planFile": "./playful-wiggling-sprout.md",
+  "planContent": "# Plan: Clean Up Agents - Keep Only Execute\n\n## Summary\nRemove all 6 specialized agents (bugfix, feature, refactor, builder, migrator, scaffold) since the execute agent + /harness skill workflow replaces them. Going forward, all task execution will use Claude Code plan mode → /harness skill → execute agent.\n\n---\n\n## Step 1: Delete Agent Directories\n\nRemove these 6 directories entirely:\n- `src/agents/bugfix/`\n- `src/agents/feature/`\n- `src/agents/refactor/`\n- `src/agents/builder/`\n- `src/agents/migrator/`\n- `src/agents/scaffold/`\n\n**Keep:** `src/agents/execute/`\n\n---\n\n## Step 2: Update `src/agents/index.ts`\n\nRemove all exports except execute:\n\n```typescript\n/**\n * AI Agents - Execute Agent\n */\nexport { runExecute, type ExecuteOptions } from \"./execute\";\n```\n\n---\n\n## Step 3: Update `src/core/state.ts`\n\n### Remove Types\n- `BuilderState`, `FeatureTest`, `FeatureCategory`\n- `MigratorState`, `MigrationFile`, `MigrationFileStatus`\n- `ScaffoldState`, `ScaffoldTask`, `ScaffoldTaskStatus`\n- `BugfixState`\n- `FeatureState`\n- `RefactorState`, `RefactorFocus`\n\n### Update `AgentType`\n```typescript\nexport type AgentType = \"execute\";\n```\n\n### Update `ProjectState` union\n```typescript\nexport type ProjectState = ExecuteState;\n```\n\n### Keep (used by execute)\n- `BaseState`\n- `ExecuteState`, `ExecutionPermissions`, `ExecutionConfig`\n- `AgentTask`, `AgentTaskStatus` (aliased from existing types)\n- Core functions: `loadState`, `saveState`, `hasExistingState`, `detectStateType`\n- Execute-specific: `loadExecuteTasks`, `saveExecuteTasks`, `getExecuteTasksPath`, `syncExecuteTasksFromFile`\n- Progress: `appendProgress`, `readProgress`, `getProgressFilePath`\n- Session: `incrementSession`, `markInitialized`\n- Completion: `isComplete` (simplified)\n- Progress display: `printProgress`, `printExecuteProgress`\n\n### Remove\n- All builder/migrator/scaffold/bugfix/feature/refactor specific functions\n- File path helpers for removed agents\n- Load/save functions for removed agents\n- Progress functions for removed agents\n\n---\n\n## Step 4: Update `src/cli.ts`\n\n### Remove Commands\n- `bugfix` command (lines 63-117)\n- `feature` command (lines 119-172)\n- `refactor` command (lines 174-217)\n- `build` command (lines 219-271)\n- `migrate` command (lines 273-314)\n- `scaffold` command (lines 316-379)\n- `resume` command (lines 417-511) - replaced by `execute --resume`\n\n### Keep Commands\n- `execute` (lines 385-411)\n- `status` (lines 517-597) - simplify to only handle execute state\n\n### Update Imports\nRemove unused imports:\n```typescript\n// Remove these:\nimport { runBugFix } from \"./agents/bugfix\";\nimport { runFeature } from \"./agents/feature\";\nimport { runRefactor } from \"./agents/refactor\";\nimport { runBuilder } from \"./agents/builder\";\nimport { runMigrator } from \"./agents/migrator\";\nimport { runScaffold } from \"./agents/scaffold\";\n```\n\n### Update Help Text\nSimplify to only show execute command usage.\n\n---\n\n## Step 5: Update `src/core/permissions.ts`\n\nThis file imports `AgentType` from state, so it will update automatically. However, simplify the `getAllowedCommands` function since only execute type exists.\n\n---\n\n## Step 6: Update `src/core/longrunning.ts`\n\nReview imports - it imports `BuilderState`, `MigratorState`, `ScaffoldState` from state. Remove unused imports. The core loop logic should still work for execute agent.\n\n---\n\n## Step 7: Update `README.md`\n\nRewrite to document the new workflow:\n1. Create plan in Claude Code plan mode\n2. Run `/harness` skill to generate execution config\n3. Run `mizu execute <config.json>` to execute\n\n---\n\n## Execution Order\n\n1. Delete 6 agent directories\n2. Update `src/agents/index.ts`\n3. Update `src/core/state.ts` - remove types and functions\n4. Update `src/cli.ts` - remove commands and imports\n5. Update `src/core/permissions.ts` - simplify\n6. Update `src/core/longrunning.ts` - remove unused imports\n7. Update `README.md` - document new workflow\n8. Run `npm run build` / `npx tsc --noEmit` - verify compilation\n9. Test `mizu execute --help`\n\n---\n\n## Verification\n\n1. **TypeScript builds:** `npx tsc --noEmit`\n2. **Execute works:** `mizu execute --help`\n3. **No orphans:** Search for any remaining references to removed agents\n4. **Docs accurate:** README matches actual CLI commands\n",
+  "tasks": [
+    {
+      "id": "task-001",
+      "description": "Delete 6 agent directories: src/agents/bugfix/, src/agents/feature/, src/agents/refactor/, src/agents/builder/, src/agents/migrator/, src/agents/scaffold/",
+      "status": "completed",
+      "dependencies": [],
+      "verificationCommand": null,
+      "completedAt": "2026-01-15T08:15:24Z",
+      "notes": "Successfully deleted all 6 agent directories (bugfix, feature, refactor, builder, migrator, scaffold). Verified that only execute directory remains in src/agents/."
+    },
+    {
+      "id": "task-002",
+      "description": "Update src/agents/index.ts - remove all exports except execute agent",
+      "status": "pending",
+      "dependencies": [
+        "task-001"
+      ],
+      "verificationCommand": null
+    },
+    {
+      "id": "task-003",
+      "description": "Update src/core/state.ts - remove all builder/migrator/scaffold/bugfix/feature/refactor types, state creation functions, load/save functions, and progress display functions. Keep only BaseState, ExecuteState, AgentTask, and execute-related functions",
+      "status": "pending",
+      "dependencies": [
+        "task-002"
+      ],
+      "verificationCommand": null
+    },
+    {
+      "id": "task-004",
+      "description": "Update src/cli.ts - remove bugfix, feature, refactor, build, migrate, scaffold, and resume commands. Keep only execute and status commands. Update imports and help text",
+      "status": "pending",
+      "dependencies": [
+        "task-003"
+      ],
+      "verificationCommand": null
+    },
+    {
+      "id": "task-005",
+      "description": "Update src/core/permissions.ts - simplify getAllowedCommands since only execute type exists",
+      "status": "pending",
+      "dependencies": [
+        "task-004"
+      ],
+      "verificationCommand": null
+    },
+    {
+      "id": "task-006",
+      "description": "Update src/core/longrunning.ts - remove unused imports (BuilderState, MigratorState, ScaffoldState)",
+      "status": "pending",
+      "dependencies": [
+        "task-005"
+      ],
+      "verificationCommand": null
+    },
+    {
+      "id": "task-007",
+      "description": "Update README.md - document new workflow: 1) Create plan in Claude Code plan mode, 2) Run /harness skill to generate execution config, 3) Run mizu execute <config.json>",
+      "status": "pending",
+      "dependencies": [
+        "task-006"
+      ],
+      "verificationCommand": null
+    },
+    {
+      "id": "task-008",
+      "description": "Run TypeScript type check to verify compilation succeeds with no errors",
+      "status": "pending",
+      "dependencies": [
+        "task-007"
+      ],
+      "verificationCommand": "bun run typecheck"
+    },
+    {
+      "id": "task-009",
+      "description": "Test that mizu execute --help works correctly",
+      "status": "pending",
+      "dependencies": [
+        "task-008"
+      ],
+      "verificationCommand": "mizu execute --help"
+    }
+  ],
+  "completedTasks": 1,
+  "totalTasks": 9,
+  "permissions": {
+    "preset": "dev",
+    "inferred": [],
+    "allow": [],
+    "deny": []
+  },
+  "recentSummaries": [
+    "Task task-001: I'll start by orienting myself to the codebase and then execute the first task.Good! Now let me check what agent directories currently exist:Perfect! I can see all 6 directories that need to be deleted plus the execute directory that should be kept. Now I'll execute task-001 by deleting the 6 agent directories:Now let me verify the deletion was successful:Excellent! All 6 agent directories have been successfully deleted, and only the `execute` directory remains. Now I'll update the task status in execute_tasks.json:Now I'll commit the progress:Now I'll document this in the progress file:Perfect! Task-001 has been completed successfully. Let me verify the progress file was updated:Excellent! Task-001 is now complete. Let me provide a summary:; ## Task-001 Completed Successfully ✓; - Git commit shows 30 files changed with 5,463 deletions"
+  ]
+}
