@@ -1,0 +1,83 @@
+[
+  {
+    "id": "task-001",
+    "description": "Delete 6 agent directories: src/agents/bugfix/, src/agents/feature/, src/agents/refactor/, src/agents/builder/, src/agents/migrator/, src/agents/scaffold/",
+    "status": "completed",
+    "dependencies": [],
+    "verificationCommand": null,
+    "completedAt": "2026-01-15T08:15:24Z",
+    "notes": "Successfully deleted all 6 agent directories (bugfix, feature, refactor, builder, migrator, scaffold). Verified that only execute directory remains in src/agents/."
+  },
+  {
+    "id": "task-002",
+    "description": "Update src/agents/index.ts - remove all exports except execute agent",
+    "status": "pending",
+    "dependencies": [
+      "task-001"
+    ],
+    "verificationCommand": null
+  },
+  {
+    "id": "task-003",
+    "description": "Update src/core/state.ts - remove all builder/migrator/scaffold/bugfix/feature/refactor types, state creation functions, load/save functions, and progress display functions. Keep only BaseState, ExecuteState, AgentTask, and execute-related functions",
+    "status": "pending",
+    "dependencies": [
+      "task-002"
+    ],
+    "verificationCommand": null
+  },
+  {
+    "id": "task-004",
+    "description": "Update src/cli.ts - remove bugfix, feature, refactor, build, migrate, scaffold, and resume commands. Keep only execute and status commands. Update imports and help text",
+    "status": "pending",
+    "dependencies": [
+      "task-003"
+    ],
+    "verificationCommand": null
+  },
+  {
+    "id": "task-005",
+    "description": "Update src/core/permissions.ts - simplify getAllowedCommands since only execute type exists",
+    "status": "pending",
+    "dependencies": [
+      "task-004"
+    ],
+    "verificationCommand": null
+  },
+  {
+    "id": "task-006",
+    "description": "Update src/core/longrunning.ts - remove unused imports (BuilderState, MigratorState, ScaffoldState)",
+    "status": "pending",
+    "dependencies": [
+      "task-005"
+    ],
+    "verificationCommand": null
+  },
+  {
+    "id": "task-007",
+    "description": "Update README.md - document new workflow: 1) Create plan in Claude Code plan mode, 2) Run /harness skill to generate execution config, 3) Run mizu execute <config.json>",
+    "status": "pending",
+    "dependencies": [
+      "task-006"
+    ],
+    "verificationCommand": null
+  },
+  {
+    "id": "task-008",
+    "description": "Run TypeScript type check to verify compilation succeeds with no errors",
+    "status": "pending",
+    "dependencies": [
+      "task-007"
+    ],
+    "verificationCommand": "bun run typecheck"
+  },
+  {
+    "id": "task-009",
+    "description": "Test that mizu execute --help works correctly",
+    "status": "pending",
+    "dependencies": [
+      "task-008"
+    ],
+    "verificationCommand": "mizu execute --help"
+  }
+]
