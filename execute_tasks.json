@@ -55,10 +55,12 @@
   {
     "id": "task-006",
     "description": "Update README.md with plugin installation instructions, /harness skill usage, and MCP status tool documentation",
-    "status": "pending",
+    "status": "completed",
     "dependencies": [
       "task-005"
     ],
-    "verificationCommand": null
+    "verificationCommand": null,
+    "completedAt": "2026-01-15T20:04:00Z",
+    "notes": "Added comprehensive Claude Code Plugin section to README.md. Documented plugin installation (claude plugin install ./plugin), /harness skill usage (plan to execution config conversion), and MCP status tools (mizu_status, mizu_tasks, mizu_progress). Section includes examples, workflow steps, and tool descriptions. All 6 tasks now complete."
   }
 ]

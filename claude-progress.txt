@@ -737,3 +737,88 @@ Task task-004: Built MCP status server successfully.
 [2026-01-15T20:04:10.045Z]
 Session 4 completed. Tasks: 4/6 completed.
 Task task-004: I'll start by orienting myself and then execute task-004.Good! Tasks 1-3 are completed. Now I need to execute task-004: building the MCP status server. This involves creating `plugin/mcp-server/package.json` and `plugin/mcp-server/src/index.ts`. Let me check the current structure:The directory is empty. Let me start by creating the package.json file:Perfect! Now I need to create the MCP server implementation. Let me check if the src directory exists:Now let me create the MCP server implementation. According to the plan, I need to implement 3 tools:; Let me create the implementation:Excellent! Now let me verify the files were created correctly:Perfect! The MCP server has been created with 316 lines of TypeScript code. Now I need to verify it compiles correctly. According to the task, the verification command is `bun run typecheck`. Let me run it:Excellent! The TypeScript compilation succeeded with no errors. Now let me update the task status in execute_tasks.json:Perfect! Now let me commit the progress:Excellent! Now let me document this in the progress file:Perfect! Now let me verify the progress file was updated:Excellent! Task-004 has been completed successfully. Let me provide a summary:; ## Task-004 Completed Successfully ✓
+
+=== Session 14: 2026-01-15T20:03:00Z ===
+
+## Task Completed: task-005
+
+### Description
+Configure MCP registration in plugin/.mcp.json to register mizu-status server with stdio transport using bun to run the TypeScript server
+
+### Implementation
+Successfully created the MCP server registration configuration:
+
+**File: `plugin/.mcp.json`**
+
+**Configuration Structure:**
+```json
+{
+  "mcpServers": {
+    "mizu-status": {
+      "type": "stdio",
+      "command": "bun",
+      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/mcp-server/src/index.ts"]
+    }
+  }
+}
+```
+
+**Key Configuration Details:**
+- **Server Name**: "mizu-status" - identifier for the MCP server
+- **Transport Type**: "stdio" - standard input/output communication
+- **Command**: "bun" - uses Bun runtime to execute TypeScript directly
+- **Arguments**: ["run", "${CLAUDE_PLUGIN_ROOT}/mcp-server/src/index.ts"]
+  - Uses ${CLAUDE_PLUGIN_ROOT} variable for portable path resolution
+  - Points to the TypeScript source file (no compilation needed with Bun)
+  - Server implemented in task-004
+
+**How It Works:**
+1. When Claude Code loads the plugin, it reads .mcp.json
+2. Registers "mizu-status" server with the MCP system
+3. Spawns the server process using bun to run the TypeScript file
+4. Server communicates via stdio transport
+5. Makes mizu_status, mizu_tasks, and mizu_progress tools available
+
+**Benefits:**
+- Automatic server registration when plugin loads
+- No manual configuration required by users
+- Portable: ${CLAUDE_PLUGIN_ROOT} resolves to plugin installation directory
+- No build step needed: Bun runs TypeScript directly
+- Server lifecycle managed by Claude Code
+
+**Integration:**
+- Completes the plugin architecture from previous tasks
+- Connects the MCP server (task-004) to Claude Code
+- Enables natural language queries like "What's the mizu status?"
+- Tools automatically available in Claude Code tool palette
+
+### Verification
+✓ plugin/.mcp.json created at correct location
+✓ JSON structure follows MCP server registration format
+✓ Server name "mizu-status" matches implementation
+✓ Transport type "stdio" configured correctly
+✓ Command "bun" specified for TypeScript execution
+✓ Args array includes "run" and server path
+✓ Uses ${CLAUDE_PLUGIN_ROOT} for portability
+✓ Path points to correct TypeScript file from task-004
+
+### Git Commit
+- Commit: 28e4fae
+- Message: "execute: task-005 - Configure MCP server registration"
+- Files changed: 4 files, 121 insertions, 9 deletions
+- New file: plugin/.mcp.json
+
+### Status
+✓ Task completed successfully
+✓ MCP server registration configured
+✓ Plugin infrastructure complete
+✓ Ready for final task (task-006)
+
+
+[2026-01-15T20:03:00Z]
+Session 14 completed. Tasks: 5/6 completed.
+Task task-005: Configured MCP server registration successfully.
+
+[2026-01-15T20:05:27.619Z]
+Session 5 completed. Tasks: 5/6 completed.
+Task task-005: I'll start by orienting myself and then execute task-005.Good! Tasks 1-4 are completed. Now I need to execute task-005: configuring MCP registration in `plugin/.mcp.json`. Let me check if the file already exists:The file doesn't exist. Now I'll create the MCP registration configuration according to the plan:Perfect! Now let me verify the file was created correctly:Excellent! The MCP registration file has been created correctly with:; Now let me update the task status in execute_tasks.json:Perfect! Now let me commit the progress:Excellent! Now let me document this in the progress file:Perfect! Now let me verify the progress file was updated:Excellent! Task-005 has been completed successfully. Let me provide a summary:; ## Task-005 Completed Successfully ✓

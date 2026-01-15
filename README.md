@@ -54,6 +54,61 @@ To unlink:
 bun unlink mizu
 ```
 
+## Claude Code Plugin
+
+For the best experience, install the mizu plugin for Claude Code. The plugin provides:
+- **`/harness` skill** - Generate execution configs directly from plans
+- **Auto-install** - Automatically installs mizu CLI on first use
+- **Status tools** - Check execution status via natural language
+
+### Plugin Installation
+
+```bash
+# Install the plugin into Claude Code
+claude plugin install ./plugin
+
+# Or install from a specific directory
+claude plugin install /path/to/ai-agents/plugin
+```
+
+The plugin will be loaded automatically in future Claude Code sessions.
+
+### Using the /harness Skill
+
+The `/harness` skill converts Claude Code plans into mizu execution configs:
+
+```
+# In Claude Code, after creating a plan:
+User: /harness
+
+# Or specify a plan file:
+User: /harness ./docs/plans/my-feature.md
+```
+
+The skill will:
+1. Extract tasks from the plan
+2. Infer permissions based on plan content
+3. Suggest verification commands for each task
+4. Generate an execution config JSON file
+5. Show you the command to run mizu
+
+### Checking Execution Status
+
+With the plugin installed, you can check mizu execution status using natural language in Claude Code:
+
+```
+User: "What's the mizu status for this project?"
+User: "Show me the mizu tasks"
+User: "What's the recent mizu progress?"
+```
+
+The plugin provides three MCP tools:
+- **mizu_status** - Current execution status and progress
+- **mizu_tasks** - Complete task list with status
+- **mizu_progress** - Recent progress notes
+
+These tools read state files without modifying them, so you can safely query status at any time.
+
 ## Quick Start
 
 ### 1. Create a Plan in Claude Code
