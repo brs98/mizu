@@ -18,7 +18,7 @@ import { join, dirname } from "node:path";
 // Core Types
 // =============================================================================
 
-export type AgentType = "builder" | "migrator" | "scaffold" | "bugfix" | "feature" | "refactor";
+export type AgentType = "builder" | "migrator" | "scaffold" | "bugfix" | "feature" | "refactor" | "execute";
 
 // Backwards compatibility alias
 export type LongRunningAgentType = AgentType;
@@ -166,6 +166,42 @@ export interface RefactorState extends BaseState {
 }
 
 // =============================================================================
+// Execute State (Plan Execution)
+// =============================================================================
+
+export interface ExecutionPermissions {
+  preset: "readonly" | "dev" | "full";
+  inferred: string[];
+  allow: string[];
+  deny: string[];
+}
+
+export interface ExecutionConfig {
+  version: string;
+  planFile: string;
+  projectDir: string;
+  model: string;
+  tasks: AgentTask[];
+  permissions: ExecutionPermissions;
+  context: {
+    completionSummary: string;
+    sessionCount: number;
+  };
+}
+
+export interface ExecuteState extends BaseState {
+  type: "execute";
+  configFile: string;
+  planFile: string;
+  planContent: string;
+  tasks: AgentTask[];
+  completedTasks: number;
+  totalTasks: number;
+  permissions: ExecutionPermissions;
+  recentSummaries: string[]; // Last 3 session summaries for bounded context
+}
+
+// =============================================================================
 // Union Type
 // =============================================================================
 
@@ -175,7 +211,8 @@ export type ProjectState =
   | ScaffoldState
   | BugfixState
   | FeatureState
-  | RefactorState;
+  | RefactorState
+  | ExecuteState;
 
 // =============================================================================
 // File Paths
@@ -188,6 +225,7 @@ const SCAFFOLD_TASKS_FILE = "scaffold_tasks.json";
 const BUGFIX_TASKS_FILE = "bugfix_tasks.json";
 const FEATURE_TASKS_FILE = "feature_tasks.json";
 const REFACTOR_TASKS_FILE = "refactor_tasks.json";
+const EXECUTE_TASKS_FILE = "execute_tasks.json";
 const PROGRESS_FILE = "claude-progress.txt";
 
 export function getStateFilePath(projectDir: string): string {
@@ -216,6 +254,10 @@ export function getFeatureTasksPath(projectDir: string): string {
 
 export function getRefactorTasksPath(projectDir: string): string {
   return join(projectDir, REFACTOR_TASKS_FILE);
+}
+
+export function getExecuteTasksPath(projectDir: string): string {
+  return join(projectDir, EXECUTE_TASKS_FILE);
 }
 
 export function getProgressFilePath(projectDir: string): string {
@@ -323,6 +365,14 @@ export function loadRefactorState(projectDir: string): RefactorState | null {
   const state = loadState(projectDir);
   if (state?.type === "refactor") {
     return state as RefactorState;
+  }
+  return null;
+}
+
+export function loadExecuteState(projectDir: string): ExecuteState | null {
+  const state = loadState(projectDir);
+  if (state?.type === "execute") {
+    return state as ExecuteState;
   }
   return null;
 }
@@ -495,6 +545,38 @@ export function createRefactorState(options: CreateRefactorStateOptions): Refact
   };
 }
 
+export interface CreateExecuteStateOptions {
+  projectDir: string;
+  model: string;
+  configFile: string;
+  planFile: string;
+  planContent: string;
+  tasks: AgentTask[];
+  permissions: ExecutionPermissions;
+}
+
+export function createExecuteState(options: CreateExecuteStateOptions): ExecuteState {
+  const now = new Date().toISOString();
+  return {
+    version: "1.0.0",
+    type: "execute",
+    initialized: true, // Execute starts initialized (no initializer phase)
+    sessionCount: 0,
+    createdAt: now,
+    updatedAt: now,
+    model: options.model,
+    projectDir: options.projectDir,
+    configFile: options.configFile,
+    planFile: options.planFile,
+    planContent: options.planContent,
+    tasks: options.tasks,
+    completedTasks: 0,
+    totalTasks: options.tasks.length,
+    permissions: options.permissions,
+    recentSummaries: [],
+  };
+}
+
 // =============================================================================
 // State Saving
 // =============================================================================
@@ -521,7 +603,7 @@ export function saveState(state: ProjectState): void {
   } else if (state.type === "scaffold") {
     state.totalTasks = state.tasks.length;
     state.completedTasks = state.tasks.filter((t) => t.status === "completed").length;
-  } else if (state.type === "bugfix" || state.type === "feature" || state.type === "refactor") {
+  } else if (state.type === "bugfix" || state.type === "feature" || state.type === "refactor" || state.type === "execute") {
     state.totalTasks = state.tasks.length;
     state.completedTasks = state.tasks.filter((t) => t.status === "completed").length;
   }
@@ -853,6 +935,68 @@ export function getRefactorProgress(tasks: AgentTask[]): {
 }
 
 // =============================================================================
+// Execute Tasks Management
+// =============================================================================
+
+export function loadExecuteTasks(projectDir: string): AgentTask[] {
+  const tasksPath = getExecuteTasksPath(projectDir);
+  if (!existsSync(tasksPath)) {
+    return [];
+  }
+
+  try {
+    const content = readFileSync(tasksPath, "utf-8");
+    return JSON.parse(content) as AgentTask[];
+  } catch (error) {
+    console.error(`Failed to load execute tasks from ${tasksPath}:`, error);
+    return [];
+  }
+}
+
+export function saveExecuteTasks(projectDir: string, tasks: AgentTask[]): void {
+  const tasksPath = getExecuteTasksPath(projectDir);
+  writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
+}
+
+export function syncExecuteTasksFromFile(state: ExecuteState): ExecuteState {
+  const tasks = loadExecuteTasks(state.projectDir);
+  // If no tasks file exists yet, use the tasks from state
+  if (tasks.length === 0 && state.tasks.length > 0) {
+    return state;
+  }
+  return {
+    ...state,
+    tasks: tasks.length > 0 ? tasks : state.tasks,
+    totalTasks: tasks.length > 0 ? tasks.length : state.tasks.length,
+    completedTasks: (tasks.length > 0 ? tasks : state.tasks).filter((t) => t.status === "completed").length,
+  };
+}
+
+export function getExecuteProgress(tasks: AgentTask[]): {
+  total: number;
+  completed: number;
+  pending: number;
+  inProgress: number;
+  blocked: number;
+  skipped: number;
+  percentage: number;
+} {
+  return getScaffoldProgress(tasks); // Reuse scaffold progress since task structure is identical
+}
+
+export function addRecentSummary(state: ExecuteState, summary: string): ExecuteState {
+  const recentSummaries = [...state.recentSummaries, summary];
+  // Keep only the last 3 summaries
+  if (recentSummaries.length > 3) {
+    recentSummaries.shift();
+  }
+  return {
+    ...state,
+    recentSummaries,
+  };
+}
+
+// =============================================================================
 // Progress File Management
 // =============================================================================
 
@@ -1036,6 +1180,30 @@ export function printRefactorProgress(state: RefactorState): void {
   console.log("-".repeat(50) + "\n");
 }
 
+export function printExecuteProgress(state: ExecuteState): void {
+  const progress = getExecuteProgress(state.tasks);
+
+  console.log("\n" + "-".repeat(50));
+  console.log("  PLAN EXECUTION PROGRESS");
+  console.log("-".repeat(50));
+  console.log(`  Plan: ${state.planFile}`);
+  console.log(`  Sessions completed: ${state.sessionCount}`);
+  console.log(`  Tasks: ${progress.completed}/${progress.total} completed (${progress.percentage}%)`);
+  if (progress.inProgress > 0) console.log(`  In progress: ${progress.inProgress}`);
+  if (progress.blocked > 0) console.log(`  Blocked: ${progress.blocked}`);
+  if (progress.skipped > 0) console.log(`  Skipped: ${progress.skipped}`);
+
+  if (progress.pending > 0) {
+    const nextTask = getNextPendingTask(state.tasks);
+    if (nextTask) {
+      console.log(`  Next task: ${nextTask.description.slice(0, 50)}...`);
+    }
+  } else if (progress.completed === progress.total) {
+    console.log("  Status: PLAN EXECUTION COMPLETE!");
+  }
+  console.log("-".repeat(50) + "\n");
+}
+
 export function printProgress(state: ProjectState): void {
   if (state.type === "builder") {
     printBuilderProgress(state);
@@ -1049,6 +1217,8 @@ export function printProgress(state: ProjectState): void {
     printFeatureProgress(state);
   } else if (state.type === "refactor") {
     printRefactorProgress(state);
+  } else if (state.type === "execute") {
+    printExecuteProgress(state);
   }
 }
 
@@ -1068,7 +1238,8 @@ export function isComplete(state: ProjectState): boolean {
     state.type === "scaffold" ||
     state.type === "bugfix" ||
     state.type === "feature" ||
-    state.type === "refactor"
+    state.type === "refactor" ||
+    state.type === "execute"
   ) {
     return (
       state.tasks.length > 0 &&

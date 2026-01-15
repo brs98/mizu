@@ -10,7 +10,7 @@
  * - Handles the two-agent pattern (initializer + coder)
  */
 
-import { query, type SettingSource } from "@anthropic-ai/claude-agent-sdk";
+import { query, type SettingSource, type CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 import { resolve } from "node:path";
 
 import type {
@@ -41,6 +41,9 @@ export interface LongRunningConfig {
   enablePuppeteer?: boolean;
   sandboxEnabled?: boolean;
   additionalReadPaths?: string[];
+
+  // Optional custom permission callback (overrides default)
+  canUseTool?: CanUseTool;
 
   // Callbacks
   getPrompt: (sessionNumber: number, state: ProjectState) => string;
@@ -83,10 +86,11 @@ interface ClientConfig {
   systemPrompt: string;
   enablePuppeteer: boolean;
   agentType: AgentType;
+  canUseTool?: CanUseTool;
 }
 
 function createQueryOptions(config: ClientConfig) {
-  const { projectDir, model, systemPrompt, enablePuppeteer, agentType } =
+  const { projectDir, model, systemPrompt, enablePuppeteer, agentType, canUseTool } =
     config;
 
   // Build allowed tools list
@@ -105,7 +109,7 @@ function createQueryOptions(config: ClientConfig) {
     cwd: projectDir,
     systemPrompt,
     permissionMode: "acceptEdits" as const,
-    canUseTool: createSecurePermissionCallback(agentType),
+    canUseTool: canUseTool ?? createSecurePermissionCallback(agentType),
     allowedTools,
     mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
     maxTurns: MAX_TURNS_PER_SESSION,
@@ -210,6 +214,7 @@ export async function runLongRunningAgent(
     enablePuppeteer = true,
     sandboxEnabled = true,
     additionalReadPaths = [],
+    canUseTool,
     getPrompt,
     loadState,
     saveState,
@@ -245,6 +250,7 @@ export async function runLongRunningAgent(
     systemPrompt,
     enablePuppeteer,
     agentType,
+    canUseTool,
   });
 
   // Load initial state

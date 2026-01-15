@@ -1,19 +1,20 @@
 #!/usr/bin/env bun
 /**
- * AI Agents CLI
+ * Mizu CLI
  *
  * Unified command-line interface for all specialized AI agents.
  * All agents now use the two-phase pattern with task-based state tracking.
  *
  * Commands:
- *   ai-agent bugfix --project ./my-app --error "TypeError: ..."
- *   ai-agent feature --project ./my-app --spec "Add dark mode"
- *   ai-agent refactor --project ./my-app --target "src/legacy/"
- *   ai-agent build --project ./new-app --spec-file ./app-spec.md
- *   ai-agent migrate --project ./migration -s src/schemas --swagger ./swagger.json
- *   ai-agent scaffold --project ./packages/new-client -f ./prd.md -r ./packages/existing-client
- *   ai-agent resume --project ./my-app
- *   ai-agent status --project ./my-app
+ *   mizu bugfix --project ./my-app --error "TypeError: ..."
+ *   mizu feature --project ./my-app --spec "Add dark mode"
+ *   mizu refactor --project ./my-app --target "src/legacy/"
+ *   mizu build --project ./new-app --spec-file ./app-spec.md
+ *   mizu migrate --project ./migration -s src/schemas --swagger ./swagger.json
+ *   mizu scaffold --project ./packages/new-client -f ./prd.md -r ./packages/existing-client
+ *   mizu execute ./docs/plans/feature.execution.json
+ *   mizu resume --project ./my-app
+ *   mizu status --project ./my-app
  */
 
 import { program } from "commander";
@@ -26,6 +27,7 @@ import { runRefactor } from "./agents/refactor";
 import { runBuilder } from "./agents/builder";
 import { runMigrator } from "./agents/migrator";
 import { runScaffold } from "./agents/scaffold";
+import { runExecute } from "./agents/execute";
 import {
   hasExistingState,
   detectStateType,
@@ -37,19 +39,21 @@ import {
   getBugfixProgress,
   getFeatureTaskProgress,
   getRefactorProgress,
+  getExecuteProgress,
   type BuilderState,
   type MigratorState,
   type ScaffoldState,
   type BugfixState,
   type FeatureState,
   type RefactorState,
+  type ExecuteState,
 } from "./core/state";
 
 const DEFAULT_MODEL = "claude-sonnet-4-5";
 
 program
-  .name("ai-agent")
-  .description("AI Agents for Software Engineering Tasks")
+  .name("mizu")
+  .description("Mizu - AI Agents for Software Engineering Tasks")
   .version("0.2.0");
 
 // =============================================================================
@@ -89,7 +93,7 @@ program
       const existingType = detectStateType(projectDir);
       if (existingType === "bugfix") {
         console.log("\nNote: Bugfix already in progress.");
-        console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
+        console.log("Use 'mizu resume -p " + options.project + "' to continue.\n");
         console.log("Or delete .ai-agent-state.json to start fresh.\n");
         process.exit(1);
       } else {
@@ -144,7 +148,7 @@ program
       const existingType = detectStateType(projectDir);
       if (existingType === "feature") {
         console.log("\nNote: Feature implementation already in progress.");
-        console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
+        console.log("Use 'mizu resume -p " + options.project + "' to continue.\n");
         console.log("Or delete .ai-agent-state.json to start fresh.\n");
         process.exit(1);
       } else {
@@ -189,7 +193,7 @@ program
       const existingType = detectStateType(projectDir);
       if (existingType === "refactor") {
         console.log("\nNote: Refactoring already in progress.");
-        console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
+        console.log("Use 'mizu resume -p " + options.project + "' to continue.\n");
         console.log("Or delete .ai-agent-state.json to start fresh.\n");
         process.exit(1);
       } else {
@@ -241,7 +245,7 @@ program
       const existingType = detectStateType(projectDir);
       if (existingType === "builder") {
         console.log("\nNote: Build already in progress.");
-        console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
+        console.log("Use 'mizu resume -p " + options.project + "' to continue.\n");
         console.log("Or delete .ai-agent-state.json to start fresh.\n");
         process.exit(1);
       } else {
@@ -285,7 +289,7 @@ program
       const existingType = detectStateType(projectDir);
       if (existingType === "migrator") {
         console.log("\nNote: Migration already in progress.");
-        console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
+        console.log("Use 'mizu resume -p " + options.project + "' to continue.\n");
         process.exit(1);
       } else {
         console.error(`Error: Project has existing ${existingType} state.`);
@@ -339,7 +343,7 @@ program
       const existingType = detectStateType(projectDir);
       if (existingType === "scaffold") {
         console.log("\nNote: Scaffold already in progress.");
-        console.log("Use 'ai-agent resume -p " + options.project + "' to continue.\n");
+        console.log("Use 'mizu resume -p " + options.project + "' to continue.\n");
         process.exit(1);
       } else {
         console.error(`Error: Project has existing ${existingType} state.`);
@@ -367,6 +371,38 @@ program
         verificationCommands,
         model: options.model,
         maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
+      });
+    } catch (err) {
+      console.error("Fatal error:", err);
+      process.exit(1);
+    }
+  });
+
+// =============================================================================
+// Execute Command (run plans from /harness skill)
+// =============================================================================
+
+program
+  .command("execute")
+  .description("Execute a plan from an execution config file")
+  .argument("<config>", "Path to execution config JSON file")
+  .option("--resume", "Resume interrupted execution")
+  .option("--force", "Force restart, overwriting existing state")
+  .option("-m, --model <name>", "Claude model to use (overrides config)")
+  .option("--max-sessions <number>", "Maximum number of sessions")
+  .action(async (configPath, options) => {
+    if (!existsSync(configPath)) {
+      console.error(`Error: Config file not found: ${configPath}`);
+      process.exit(1);
+    }
+
+    try {
+      await runExecute({
+        configFile: resolve(configPath),
+        model: options.model,
+        maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
+        resume: options.resume,
+        force: options.force,
       });
     } catch (err) {
       console.error("Fatal error:", err);
@@ -456,6 +492,14 @@ program
           model: options.model,
           maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
         });
+      } else if (stateType === "execute") {
+        const state = loadState(projectDir) as ExecuteState;
+        await runExecute({
+          configFile: state.configFile,
+          model: options.model,
+          maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
+          resume: true,
+        });
       } else {
         console.error(`Error: Unknown state type: ${stateType}`);
         process.exit(1);
@@ -509,6 +553,8 @@ program
         progress = getFeatureTaskProgress((state as FeatureState).tasks);
       } else if (state.type === "refactor") {
         progress = getRefactorProgress((state as RefactorState).tasks);
+      } else if (state.type === "execute") {
+        progress = getExecuteProgress((state as ExecuteState).tasks);
       }
 
       console.log(
@@ -563,32 +609,37 @@ Examples:
   # All agents support resume and status commands
 
   # Bug fix
-  $ ai-agent bugfix -p ./my-app -e "TypeError: Cannot read property 'x' of undefined"
-  $ ai-agent bugfix -p ./my-app -f ./error.log
+  $ mizu bugfix -p ./my-app -e "TypeError: Cannot read property 'x' of undefined"
+  $ mizu bugfix -p ./my-app -f ./error.log
 
   # Feature implementation
-  $ ai-agent feature -p ./my-app -s "Add a dark mode toggle to settings"
-  $ ai-agent feature -p ./my-app -f ./feature-spec.md
+  $ mizu feature -p ./my-app -s "Add a dark mode toggle to settings"
+  $ mizu feature -p ./my-app -f ./feature-spec.md
 
   # Refactoring
-  $ ai-agent refactor -p ./my-app -t "src/api/" --focus performance
-  $ ai-agent refactor -p ./my-app --focus readability
+  $ mizu refactor -p ./my-app -t "src/api/" --focus performance
+  $ mizu refactor -p ./my-app --focus readability
 
   # Build complete application
-  $ ai-agent build -p ./new-app -f ./app-spec.md
+  $ mizu build -p ./new-app -f ./app-spec.md
 
   # Schema migration
-  $ ai-agent migrate -p ./migration-state -s src/schemas --swagger ./swagger.json
+  $ mizu migrate -p ./migration-state -s src/schemas --swagger ./swagger.json
 
   # Scaffold new package with reference
-  $ ai-agent scaffold -p ./packages/new-api-client -f ./prd.md -r ./packages/existing-client
+  $ mizu scaffold -p ./packages/new-api-client -f ./prd.md -r ./packages/existing-client
+
+  # Execute a plan from /harness skill
+  $ mizu execute ./docs/plans/feature.execution.json
+  $ mizu execute --resume ./docs/plans/feature.execution.json
+  $ mizu execute --force ./docs/plans/feature.execution.json
 
   # Resume any agent
-  $ ai-agent resume -p ./my-app
+  $ mizu resume -p ./my-app
 
   # Check progress of any agent
-  $ ai-agent status -p ./my-app
-  $ ai-agent status -p ./my-app --json
+  $ mizu status -p ./my-app
+  $ mizu status -p ./my-app --json
 
 All agents support:
   - Persistent state for crash recovery

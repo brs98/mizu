@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "planFile": "./2025-01-15-test-feature.md",
+  "projectDir": "/Users/brandon/work/ai-agents",
+  "model": "claude-sonnet-4-5",
+  "tasks": [
+    {
+      "id": "task-001",
+      "description": "Create the preferences schema and types in src/core/preferences.ts",
+      "status": "pending",
+      "dependencies": [],
+      "verificationCommand": null
+    },
+    {
+      "id": "task-002",
+      "description": "Implement the preferences file storage with read/write functions",
+      "status": "pending",
+      "dependencies": ["task-001"],
+      "verificationCommand": null
+    },
+    {
+      "id": "task-003",
+      "description": "Add CLI commands for getting and setting preferences",
+      "status": "pending",
+      "dependencies": ["task-002"],
+      "verificationCommand": null
+    },
+    {
+      "id": "task-004",
+      "description": "Write unit tests for the preferences module",
+      "status": "pending",
+      "dependencies": ["task-003"],
+      "verificationCommand": "bun test"
+    },
+    {
+      "id": "task-005",
+      "description": "Update documentation with preferences usage examples",
+      "status": "pending",
+      "dependencies": ["task-004"],
+      "verificationCommand": null
+    }
+  ],
+  "permissions": {
+    "preset": "dev",
+    "inferred": [],
+    "allow": [],
+    "deny": []
+  },
+  "context": {
+    "completionSummary": "",
+    "sessionCount": 0
+  }
+}
