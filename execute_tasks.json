@@ -44,11 +44,13 @@
   {
     "id": "task-005",
     "description": "Configure MCP registration in plugin/.mcp.json to register mizu-status server with stdio transport using bun to run the TypeScript server",
-    "status": "pending",
+    "status": "completed",
     "dependencies": [
       "task-004"
     ],
-    "verificationCommand": null
+    "verificationCommand": null,
+    "completedAt": "2026-01-15T20:03:00Z",
+    "notes": "Created plugin/.mcp.json with mizu-status MCP server registration. Configured stdio transport with bun command to run the TypeScript server. Uses ${CLAUDE_PLUGIN_ROOT} variable for portable path resolution. Server will be automatically available in Claude Code when plugin is loaded."
   },
   {
     "id": "task-006",
