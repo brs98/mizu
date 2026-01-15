@@ -89,21 +89,21 @@ describe("buildFilesystemPermissions", () => {
 describe("buildToolPermissions", () => {
   test("always includes Bash permission", () => {
     const permissions = buildToolPermissions({});
-    expect(permissions).toContain("Bash(*)");
+    expect(permissions).toContain("Bash");
   });
 
   test("includes Puppeteer tools when enabled", () => {
     const permissions = buildToolPermissions({ enablePuppeteer: true });
-    expect(permissions).toContain("Bash(*)");
-    expect(permissions).toContain("mcp__puppeteer__puppeteer_navigate(*)");
-    expect(permissions).toContain("mcp__puppeteer__puppeteer_screenshot(*)");
-    expect(permissions).toContain("mcp__puppeteer__puppeteer_click(*)");
+    expect(permissions).toContain("Bash");
+    expect(permissions).toContain("mcp__puppeteer__puppeteer_navigate");
+    expect(permissions).toContain("mcp__puppeteer__puppeteer_screenshot");
+    expect(permissions).toContain("mcp__puppeteer__puppeteer_click");
   });
 
   test("excludes Puppeteer tools when disabled", () => {
     const permissions = buildToolPermissions({ enablePuppeteer: false });
-    expect(permissions).toContain("Bash(*)");
-    expect(permissions).not.toContain("mcp__puppeteer__puppeteer_navigate(*)");
+    expect(permissions).toContain("Bash");
+    expect(permissions).not.toContain("mcp__puppeteer__puppeteer_navigate");
   });
 });
 
@@ -208,14 +208,14 @@ describe("writeSettingsFile", () => {
     const path = writeSettingsFile(testDir, settings);
 
     expect(existsSync(path)).toBe(true);
-    expect(path).toBe(join(testDir, ".claude_settings.json"));
+    expect(path).toBe(join(testDir, ".claude/settings.local.json"));
   });
 
   test("writes valid JSON", () => {
     const settings = generateSettings({ projectDir: testDir });
     writeSettingsFile(testDir, settings);
 
-    const content = readFileSync(join(testDir, ".claude_settings.json"), "utf-8");
+    const content = readFileSync(join(testDir, ".claude/settings.local.json"), "utf-8");
     const parsed = JSON.parse(content);
 
     expect(parsed.sandbox).toBeDefined();
@@ -230,7 +230,7 @@ describe("writeSettingsFile", () => {
     writeSettingsFile(newDir, settings);
 
     expect(existsSync(newDir)).toBe(true);
-    expect(existsSync(join(newDir, ".claude_settings.json"))).toBe(true);
+    expect(existsSync(join(newDir, ".claude/settings.local.json"))).toBe(true);
   });
 });
 
@@ -254,7 +254,7 @@ describe("createSettingsFile", () => {
       enablePuppeteer: true,
     });
 
-    const content = readFileSync(join(testDir, ".claude_settings.json"), "utf-8");
+    const content = readFileSync(join(testDir, ".claude/settings.local.json"), "utf-8");
     const settings = JSON.parse(content);
 
     const hasPuppeteer = settings.permissions.allow.some((p: string) =>
@@ -373,7 +373,7 @@ describe("validateSettings", () => {
       sandbox: { enabled: true },
       permissions: {
         defaultMode: "default",
-        allow: ["Read(./**)", "Bash(*)"],
+        allow: ["Read(./**)", "Bash"],
       },
     };
     const result = validateSettings(settings);

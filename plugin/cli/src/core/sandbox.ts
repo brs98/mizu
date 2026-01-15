@@ -84,16 +84,16 @@ export function buildToolPermissions(options: MCPConfigOptions): string[] {
   const permissions: string[] = [];
 
   // Bash is always allowed (but validated by security hooks)
-  permissions.push("Bash(*)");
+  permissions.push("Bash");
 
   // Task and TodoWrite are always allowed
-  permissions.push("Task(*)");
-  permissions.push("TodoWrite(*)");
+  permissions.push("Task");
+  permissions.push("TodoWrite");
 
   // Add Puppeteer tools if enabled
   if (options.enablePuppeteer) {
     for (const tool of PUPPETEER_TOOLS) {
-      permissions.push(`${tool}(*)`);
+      permissions.push(tool);
     }
   }
 
