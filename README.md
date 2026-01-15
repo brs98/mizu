@@ -27,12 +27,26 @@ The mizu plugin bundles everything you need - no separate CLI installation requi
 
 ### Plugin Installation
 
+**From GitHub (recommended):**
+
 ```bash
-# In Claude Code, add the plugin marketplace
-/plugin marketplace add /path/to/mizu/plugin
+# Add the mizu marketplace
+claude plugin marketplace add brs98/mizu
 
 # Install the plugin
-/plugin install mizu
+claude plugin install mizu@mizu
+
+# Restart Claude Code to load the plugin
+```
+
+**From local path (for development):**
+
+```bash
+# Add local marketplace
+claude plugin marketplace add /path/to/mizu/plugin
+
+# Install the plugin
+claude plugin install mizu@mizu-local
 ```
 
 On your first Claude Code session after installing, the plugin will:
@@ -111,7 +125,7 @@ The `/harness` skill converts Claude Code plans into mizu execution configs:
 /harness
 
 # Or specify a plan file
-/harness ./docs/plans/my-feature.md
+/harness ./.mizu/plans/my-feature.md
 ```
 
 The skill will:
@@ -123,20 +137,20 @@ The skill will:
 
 ## Checking Execution Status
 
-With the plugin installed, you can check mizu execution status using natural language in Claude Code:
+With the plugin installed, you can check mizu execution status in Claude Code:
 
 ```
+User: /mizu-status
 User: "What's the mizu status for this project?"
-User: "Show me the mizu tasks"
-User: "What's the recent mizu progress?"
 ```
 
-The plugin provides three MCP tools:
-- **mizu_status** - Current execution status and progress
-- **mizu_tasks** - Complete task list with status
-- **mizu_progress** - Recent progress notes
+The `/mizu-status` skill reads state files from `.mizu/` and reports:
+- **Progress** - Percentage complete (X of Y tasks)
+- **Current task** - What's being worked on
+- **Session count** - How many agent sessions have run
+- **Recent activity** - Latest entries from progress log
 
-These tools read state files without modifying them, so you can safely query status at any time.
+These are read-only operations, so you can safely query status at any time.
 
 ## Commands
 
@@ -220,6 +234,7 @@ Execution creates state files in `.mizu/` directory (gitignored):
 
 ```
 mizu/
+├── marketplace.json                # GitHub marketplace manifest
 ├── plugin/                         # Claude Code plugin
 │   ├── .claude-plugin/             # Plugin manifest
 │   ├── bin/mizu                    # Shell wrapper
@@ -233,9 +248,10 @@ mizu/
 │   │       │   └── ...
 │   │       └── agents/execute/     # Execute agent implementation
 │   ├── hooks/                      # SessionStart setup hook
-│   ├── mcp-server/                 # Status checking MCP tools
 │   ├── scripts/setup.sh            # PATH configuration
-│   └── skills/harness/             # /harness skill
+│   └── skills/                     # Plugin skills
+│       ├── harness/                # /harness - generate execution configs
+│       └── mizu-status/            # /mizu-status - check execution status
 ├── package.json
 └── tsconfig.json
 ```
@@ -328,7 +344,7 @@ The execute agent loads prompts from `plugin/cli/src/agents/execute/prompts/`. P
 2. **Use verification commands** - Catch issues early
 3. **Check status frequently** - Monitor progress between sessions
 4. **Resume on interruption** - State persistence handles crashes
-5. **Review progress notes** - `claude-progress.txt` tracks all changes
+5. **Review progress notes** - `.mizu/progress.txt` tracks all changes
 
 ## License
 
