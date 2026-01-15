@@ -54,24 +54,34 @@ To unlink:
 bun unlink mizu
 ```
 
-## Claude Code Plugin
+## Claude Code Plugin (Recommended)
 
-For the best experience, install the mizu plugin for Claude Code. The plugin provides:
+The mizu plugin bundles everything you need - no separate CLI installation required:
 - **`/harness` skill** - Generate execution configs directly from plans
-- **Auto-install** - Automatically installs mizu CLI on first use
+- **Bundled CLI** - The `mizu` command is included in the plugin
+- **Auto-setup** - Automatically configures the `mizu` command on first use
 - **Status tools** - Check execution status via natural language
 
 ### Plugin Installation
 
 ```bash
-# Install the plugin into Claude Code
-claude plugin install ./plugin
+# Add the plugin marketplace
+/plugin marketplace add /path/to/ai-agents/plugin
 
-# Or install from a specific directory
-claude plugin install /path/to/ai-agents/plugin
+# Install the plugin
+/plugin install mizu
 ```
 
-The plugin will be loaded automatically in future Claude Code sessions.
+On your first Claude Code session after installing, the plugin will:
+1. Create a symlink to `~/.local/bin/mizu`
+2. Add `~/.local/bin` to your PATH (for that session)
+
+After installation, `mizu` is available from anywhere:
+
+```bash
+mizu execute ./config.json
+mizu status -p ./my-project
+```
 
 ### Using the /harness Skill
 

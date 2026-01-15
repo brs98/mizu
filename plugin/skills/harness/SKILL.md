@@ -118,10 +118,17 @@ To execute autonomously, exit Claude Code and run:
 
 Resume if interrupted:  mizu execute --resume ./path/to/config.json
 Start fresh:            mizu execute --force ./path/to/config.json
+
+If 'mizu' command not found, ensure ~/.local/bin is in your PATH:
+  export PATH="$HOME/.local/bin:$PATH"
+
+Or run directly via the plugin:
+  ~/.claude/plugins/mizu/bin/mizu execute ./path/to/config.json
 ```
 
 ## Important
 
 - Skill generates config and prints command - does NOT execute
 - User must exit Claude Code and run `mizu execute` in terminal
+- The mizu CLI is bundled with the plugin (no separate installation needed)
 - This is because mizu needs different permissions than Claude Code provides

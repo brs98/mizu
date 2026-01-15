@@ -1,0 +1,24 @@
+{
+  "name": "mizu-cli",
+  "version": "1.0.0",
+  "description": "Mizu CLI - Autonomous plan execution for Claude Code",
+  "type": "module",
+  "main": "src/cli.ts",
+  "bin": {
+    "mizu": "src/cli.ts"
+  },
+  "scripts": {
+    "execute": "bun run src/cli.ts execute",
+    "status": "bun run src/cli.ts status",
+    "typecheck": "bun x tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.61",
+    "commander": "^14.0.2",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}
