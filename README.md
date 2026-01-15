@@ -106,19 +106,19 @@ Execute a plan from an execution config file.
 
 ```bash
 # Execute plan
-bun run src/cli.ts execute <config.json>
+mizu execute <config.json>
 
 # Resume interrupted execution
-bun run src/cli.ts execute --resume <config.json>
+mizu execute --resume <config.json>
 
 # Force restart (overwrite existing state)
-bun run src/cli.ts execute --force <config.json>
+mizu execute --force <config.json>
 
 # Override model
-bun run src/cli.ts execute <config.json> -m claude-opus-4
+mizu execute <config.json> -m claude-opus-4
 
 # Limit sessions
-bun run src/cli.ts execute <config.json> --max-sessions 10
+mizu execute <config.json> --max-sessions 10
 ```
 
 **How it works:**
@@ -138,10 +138,10 @@ Check progress of plan execution.
 
 ```bash
 # Human-readable output
-bun run src/cli.ts status -p ./my-project
+mizu status -p ./my-project
 
 # JSON output (for scripting)
-bun run src/cli.ts status -p ./my-project --json
+mizu status -p ./my-project --json
 ```
 
 Shows:
@@ -232,7 +232,7 @@ User: "Add user authentication with JWT"
 User: /harness
 
 # In terminal:
-bun run src/cli.ts execute ./docs/plans/auth-feature.execution.json
+mizu execute ./docs/plans/auth-feature.execution.json
 ```
 
 ### Bug Fix
@@ -243,7 +243,7 @@ User: "Fix TypeError in user profile component"
 User: /harness
 
 # In terminal:
-bun run src/cli.ts execute ./docs/plans/bugfix.execution.json
+mizu execute ./docs/plans/bugfix.execution.json
 ```
 
 ### Refactoring
@@ -254,7 +254,7 @@ User: "Refactor API client for better error handling"
 User: /harness
 
 # In terminal:
-bun run src/cli.ts execute ./docs/plans/refactor.execution.json
+mizu execute ./docs/plans/refactor.execution.json
 ```
 
 ## Customizing Prompts
