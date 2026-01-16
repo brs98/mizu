@@ -8,6 +8,7 @@
     "mizu": "src/cli.ts"
   },
   "scripts": {
+    "build": "bun build --compile src/mizu.ts --outfile ../bin/mizu",
     "execute": "bun run src/cli.ts execute",
     "status": "bun run src/cli.ts status",
     "typecheck": "bun x tsc --noEmit"

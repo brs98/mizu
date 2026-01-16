@@ -140,7 +140,7 @@ Execution config generated: ./.mizu/<name>.execution.json
 
 First, build the mizu CLI (one-time setup):
 
-  cd <plugin-root> && bun install && bun run build
+  cd <plugin-root>/cli && bun install && bun run build
 
 Then execute autonomously:
 
