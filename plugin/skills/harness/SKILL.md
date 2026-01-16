@@ -10,9 +10,25 @@ Transform a Claude Code plan into an execution config for `mizu execute`.
 ## Usage
 
 ```
-/harness                                    # Auto-detect recent plans
-/harness ./.mizu/plans/2024-01-15-feature.md # Specific plan file
+/harness                                                    # Auto-detect recent Claude Code plans
+/harness ~/.claude/plans/squishy-prancing-mango.md          # Specific plan file
 ```
+
+## Output Structure
+
+All execution artifacts are stored in a plan-scoped directory:
+
+```
+.mizu/
+└── <plan-name>/           # e.g., squishy-prancing-mango/
+    ├── plan.md            # Copy of the original Claude Code plan
+    ├── execution.json     # Execution config (references ./plan.md)
+    ├── state.json         # Created by mizu execute
+    ├── tasks.json         # Created by mizu execute
+    └── progress.txt       # Created by mizu execute
+```
+
+This structure enables running multiple plans without conflicts.
 
 ## Workflow
 
@@ -20,7 +36,7 @@ Transform a Claude Code plan into an execution config for `mizu execute`.
 
 **With argument:** Use that file directly.
 
-**Without argument:** Scan `.mizu/plans/` for `.md` files. If multiple, use AskUserQuestion to let user choose.
+**Without argument:** Scan `~/.claude/plans/` for recent `.md` files. If multiple, use AskUserQuestion to let user choose.
 
 ### Step 2: Extract Tasks
 
@@ -67,12 +83,27 @@ Leave as `null` for ambiguous tasks (worker self-verifies).
 
 ### Step 5: Generate Config
 
-**CRITICAL FORMAT REQUIREMENTS:**
+**CRITICAL: Create plan directory and copy plan file first:**
+
+1. **Derive plan name** from the source plan filename (without `.md` extension)
+   - e.g., `~/.claude/plans/squishy-prancing-mango.md` → plan name: `squishy-prancing-mango`
+
+2. **Create plan directory:** `.mizu/<plan-name>/`
+   ```bash
+   mkdir -p .mizu/<plan-name>
+   ```
+
+3. **Copy plan to plan directory:**
+   ```bash
+   cp <source-plan-path> .mizu/<plan-name>/plan.md
+   ```
+
+4. **Generate execution.json** in the same directory:
 
 ```json
 {
   "version": "1.0.0",
-  "planFile": "./<filename>.md",
+  "planFile": "./plan.md",
   "projectDir": "/absolute/path/to/project",
   "model": "claude-sonnet-4-5",
   "tasks": [
@@ -98,14 +129,16 @@ Leave as `null` for ambiguous tasks (worker self-verifies).
 ```
 
 **Format rules:**
-- `planFile`: **RELATIVE path** (e.g., `./feature.md`, NOT absolute)
-- `projectDir`: **ABSOLUTE path**
+- `planFile`: Always `"./plan.md"` (plan is copied to same directory as execution.json)
+- `projectDir`: **ABSOLUTE path** to the project root
 - `model`: Use `claude-sonnet-4-5` (NOT date-based IDs)
 - Task IDs: Zero-padded `task-001`, `task-002`, etc.
 - Tasks have ONLY: `id`, `description`, `status`, `dependencies`, `verificationCommand`, `completedAt` (optional)
 - `permissions.inferred`: Bash command names like `["docker", "psql"]`, NOT Claude tool names
 
-Save config at: `.mizu/<plan-name>.execution.json` (sibling to state files)
+**Save locations:**
+- Plan copy: `.mizu/<plan-name>/plan.md`
+- Config: `.mizu/<plan-name>/execution.json`
 
 ### Step 6: Output Command
 
@@ -124,19 +157,23 @@ You MUST run this check. Do not assume dependencies are installed.
 
 **If dependencies installed**, output:
 ```
-Execution config generated: ./.mizu/<name>.execution.json
+Plan directory created: .mizu/<plan-name>/
+- plan.md: Copy of source plan
+- execution.json: Execution config
 
 To execute autonomously, exit Claude Code and run:
 
-  bun run <plugin-root>/cli/src/mizu.ts execute ./.mizu/<name>.execution.json
+  bun run <plugin-root>/cli/src/mizu.ts execute ./.mizu/<plan-name>/execution.json
 
-Resume if interrupted:  bun run <plugin-root>/cli/src/mizu.ts execute --resume ./.mizu/<name>.execution.json
-Start fresh:            bun run <plugin-root>/cli/src/mizu.ts execute --force ./.mizu/<name>.execution.json
+Resume if interrupted:  bun run <plugin-root>/cli/src/mizu.ts execute --resume ./.mizu/<plan-name>/execution.json
+Start fresh:            bun run <plugin-root>/cli/src/mizu.ts execute --force ./.mizu/<plan-name>/execution.json
 ```
 
 **If dependencies missing**, output:
 ```
-Execution config generated: ./.mizu/<name>.execution.json
+Plan directory created: .mizu/<plan-name>/
+- plan.md: Copy of source plan
+- execution.json: Execution config
 
 First, install dependencies (one-time setup):
 
@@ -144,16 +181,17 @@ First, install dependencies (one-time setup):
 
 Then execute autonomously:
 
-  bun run <plugin-root>/cli/src/mizu.ts execute ./.mizu/<name>.execution.json
+  bun run <plugin-root>/cli/src/mizu.ts execute ./.mizu/<plan-name>/execution.json
 
-Resume if interrupted:  bun run <plugin-root>/cli/src/mizu.ts execute --resume ./.mizu/<name>.execution.json
-Start fresh:            bun run <plugin-root>/cli/src/mizu.ts execute --force ./.mizu/<name>.execution.json
+Resume if interrupted:  bun run <plugin-root>/cli/src/mizu.ts execute --resume ./.mizu/<plan-name>/execution.json
+Start fresh:            bun run <plugin-root>/cli/src/mizu.ts execute --force ./.mizu/<plan-name>/execution.json
 ```
 
-Replace `<plugin-root>` with the actual absolute path derived from your base directory.
+Replace `<plugin-root>` with the actual absolute path and `<plan-name>` with the actual plan name.
 
 ## Important
 
 - Skill generates config and prints command - does NOT execute
 - User must exit Claude Code and run the command in terminal
 - This is because mizu needs different permissions than Claude Code provides
+- Each plan gets its own directory, so multiple plans can run without conflicts

@@ -4,15 +4,18 @@
  * File-based state persistence for the execute agent.
  * Enables crash recovery, session continuity, and progress tracking.
  *
- * All state files are stored in .mizu/ directory:
- * - .mizu/state.json: Core state (type, session count, initialized)
- * - .mizu/tasks.json: Task list for execute agent
- * - .mizu/progress.txt: Human-readable progress notes
- * - .mizu/*.execution.json: Execution configs from /harness
+ * All state files are stored in plan-scoped directories within .mizu/:
+ * - .mizu/<plan-name>/plan.md: Copy of the original plan
+ * - .mizu/<plan-name>/execution.json: Execution config from /harness
+ * - .mizu/<plan-name>/state.json: Core state (type, session count, initialized)
+ * - .mizu/<plan-name>/tasks.json: Task list for execute agent
+ * - .mizu/<plan-name>/progress.txt: Human-readable progress notes
+ *
+ * This structure enables multiple plan executions without conflicts.
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, basename } from "node:path";
 
 // =============================================================================
 // Core Types
@@ -77,6 +80,7 @@ export interface ExecutionConfig {
 
 export interface ExecuteState extends BaseState {
   type: "execute";
+  planName: string; // Plan identifier (directory name within .mizu)
   configFile: string;
   planFile: string;
   planContent: string;
@@ -101,21 +105,68 @@ const MIZU_DIR = ".mizu";
 const STATE_FILE = "state.json";
 const EXECUTE_TASKS_FILE = "tasks.json";
 const PROGRESS_FILE = "progress.txt";
+const PLAN_FILE = "plan.md";
+const EXECUTION_CONFIG_FILE = "execution.json";
 
+/**
+ * Get the base .mizu directory
+ */
 export function getMizuDir(projectDir: string): string {
   return join(projectDir, MIZU_DIR);
 }
 
-export function getStateFilePath(projectDir: string): string {
-  return join(getMizuDir(projectDir), STATE_FILE);
+/**
+ * Get plan-scoped directory: .mizu/<planName>/
+ * @param projectDir - The project root directory
+ * @param planName - The plan name (directory name within .mizu)
+ */
+export function getPlanDir(projectDir: string, planName: string): string {
+  return join(getMizuDir(projectDir), planName);
 }
 
-export function getExecuteTasksPath(projectDir: string): string {
-  return join(getMizuDir(projectDir), EXECUTE_TASKS_FILE);
+/**
+ * Extract plan name from a config file path.
+ * e.g., /project/.mizu/my-plan/execution.json -> "my-plan"
+ */
+export function getPlanNameFromConfigPath(configPath: string): string {
+  // Config is at .mizu/<plan-name>/execution.json
+  // So parent directory name is the plan name
+  return basename(dirname(configPath));
 }
 
-export function getProgressFilePath(projectDir: string): string {
-  return join(getMizuDir(projectDir), PROGRESS_FILE);
+/**
+ * Get state file path within a plan directory
+ */
+export function getStateFilePath(projectDir: string, planName: string): string {
+  return join(getPlanDir(projectDir, planName), STATE_FILE);
+}
+
+/**
+ * Get tasks file path within a plan directory
+ */
+export function getExecuteTasksPath(projectDir: string, planName: string): string {
+  return join(getPlanDir(projectDir, planName), EXECUTE_TASKS_FILE);
+}
+
+/**
+ * Get progress file path within a plan directory
+ */
+export function getProgressFilePath(projectDir: string, planName: string): string {
+  return join(getPlanDir(projectDir, planName), PROGRESS_FILE);
+}
+
+/**
+ * Get plan.md file path within a plan directory
+ */
+export function getPlanFilePath(projectDir: string, planName: string): string {
+  return join(getPlanDir(projectDir, planName), PLAN_FILE);
+}
+
+/**
+ * Get execution.json file path within a plan directory
+ */
+export function getExecutionConfigPath(projectDir: string, planName: string): string {
+  return join(getPlanDir(projectDir, planName), EXECUTION_CONFIG_FILE);
 }
 
 /**
@@ -155,16 +206,28 @@ export function ensureMizuDir(projectDir: string): void {
   }
 }
 
+/**
+ * Ensure the plan-specific directory exists within .mizu/
+ * Creates .mizu/<planName>/ and ensures .gitignore is updated
+ */
+export function ensurePlanDir(projectDir: string, planName: string): void {
+  ensureMizuDir(projectDir);
+  const planDir = getPlanDir(projectDir, planName);
+  if (!existsSync(planDir)) {
+    mkdirSync(planDir, { recursive: true });
+  }
+}
+
 // =============================================================================
 // State Detection
 // =============================================================================
 
-export function hasExistingState(projectDir: string): boolean {
-  return existsSync(getStateFilePath(projectDir));
+export function hasExistingState(projectDir: string, planName: string): boolean {
+  return existsSync(getStateFilePath(projectDir, planName));
 }
 
-export function detectStateType(projectDir: string): LongRunningAgentType | null {
-  const statePath = getStateFilePath(projectDir);
+export function detectStateType(projectDir: string, planName: string): LongRunningAgentType | null {
+  const statePath = getStateFilePath(projectDir, planName);
   if (!existsSync(statePath)) {
     return null;
   }
@@ -178,8 +241,8 @@ export function detectStateType(projectDir: string): LongRunningAgentType | null
   }
 }
 
-export function isInitialized(projectDir: string): boolean {
-  const statePath = getStateFilePath(projectDir);
+export function isInitialized(projectDir: string, planName: string): boolean {
+  const statePath = getStateFilePath(projectDir, planName);
   if (!existsSync(statePath)) {
     return false;
   }
@@ -197,8 +260,8 @@ export function isInitialized(projectDir: string): boolean {
 // State Loading
 // =============================================================================
 
-export function loadState(projectDir: string): ProjectState | null {
-  const statePath = getStateFilePath(projectDir);
+export function loadState(projectDir: string, planName: string): ProjectState | null {
+  const statePath = getStateFilePath(projectDir, planName);
   if (!existsSync(statePath)) {
     return null;
   }
@@ -212,8 +275,8 @@ export function loadState(projectDir: string): ProjectState | null {
   }
 }
 
-export function loadExecuteState(projectDir: string): ExecuteState | null {
-  const state = loadState(projectDir);
+export function loadExecuteState(projectDir: string, planName: string): ExecuteState | null {
+  const state = loadState(projectDir, planName);
   if (!state || state.type !== "execute") {
     return null;
   }
@@ -225,6 +288,7 @@ export function loadExecuteState(projectDir: string): ExecuteState | null {
 // =============================================================================
 
 export interface CreateExecuteStateOptions {
+  planName: string;
   configFile: string;
   planFile: string;
   planContent: string;
@@ -238,6 +302,7 @@ export function createExecuteState(options: CreateExecuteStateOptions): ExecuteS
   return {
     version: "1.0",
     type: "execute",
+    planName: options.planName,
     configFile: options.configFile,
     planFile: options.planFile,
     planContent: options.planContent,
@@ -260,13 +325,11 @@ export function createExecuteState(options: CreateExecuteStateOptions): ExecuteS
 // =============================================================================
 
 export function saveState(state: ProjectState): void {
-  const statePath = getStateFilePath(state.projectDir);
+  // Use planName from state to determine path
+  const statePath = getStateFilePath(state.projectDir, state.planName);
 
-  // Ensure directory exists
-  const dir = dirname(statePath);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
+  // Ensure plan directory exists
+  ensurePlanDir(state.projectDir, state.planName);
 
   // Update timestamp
   state.updatedAt = new Date().toISOString();
@@ -284,8 +347,8 @@ export function saveState(state: ProjectState): void {
 // Task Management (Execute)
 // =============================================================================
 
-export function loadExecuteTasks(projectDir: string): AgentTask[] {
-  const tasksPath = getExecuteTasksPath(projectDir);
+export function loadExecuteTasks(projectDir: string, planName: string): AgentTask[] {
+  const tasksPath = getExecuteTasksPath(projectDir, planName);
   if (!existsSync(tasksPath)) {
     return [];
   }
@@ -299,14 +362,14 @@ export function loadExecuteTasks(projectDir: string): AgentTask[] {
   }
 }
 
-export function saveExecuteTasks(projectDir: string, tasks: AgentTask[]): void {
-  ensureMizuDir(projectDir);
-  const tasksPath = getExecuteTasksPath(projectDir);
+export function saveExecuteTasks(projectDir: string, planName: string, tasks: AgentTask[]): void {
+  ensurePlanDir(projectDir, planName);
+  const tasksPath = getExecuteTasksPath(projectDir, planName);
   writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
 }
 
 export function syncExecuteTasksFromFile(state: ExecuteState): ExecuteState {
-  const tasks = loadExecuteTasks(state.projectDir);
+  const tasks = loadExecuteTasks(state.projectDir, state.planName);
   return {
     ...state,
     tasks,
@@ -354,9 +417,9 @@ export function getExecuteProgress(tasks: AgentTask[]): {
 // Progress File Management
 // =============================================================================
 
-export function appendProgress(projectDir: string, message: string): void {
-  ensureMizuDir(projectDir);
-  const progressPath = getProgressFilePath(projectDir);
+export function appendProgress(projectDir: string, planName: string, message: string): void {
+  ensurePlanDir(projectDir, planName);
+  const progressPath = getProgressFilePath(projectDir, planName);
   const timestamp = new Date().toISOString();
   const entry = `\n[${timestamp}]\n${message}\n`;
 
@@ -368,8 +431,8 @@ export function appendProgress(projectDir: string, message: string): void {
   }
 }
 
-export function readProgress(projectDir: string): string {
-  const progressPath = getProgressFilePath(projectDir);
+export function readProgress(projectDir: string, planName: string): string {
+  const progressPath = getProgressFilePath(projectDir, planName);
   if (!existsSync(progressPath)) {
     return "";
   }

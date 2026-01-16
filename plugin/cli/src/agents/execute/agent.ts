@@ -30,6 +30,9 @@ import {
   getNextPendingTask,
   saveExecuteTasks,
   addRecentSummary,
+  getPlanNameFromConfigPath,
+  hasExistingState,
+  getPlanDir,
 } from "../../core/state";
 import { createExecutePermissionCallback } from "./permissions";
 import { loadAndRenderPrompt, type PromptContext } from "../../core/prompts";
@@ -66,18 +69,18 @@ You understand that:
 - The plan provides the overall vision and approach
 - Each task should be completed fully before moving on
 - Each session is independent - you have no memory of previous sessions
-- execute_tasks.json is the source of truth for task progress
-- Git history and claude-progress.txt show what was done before
+- .mizu/<plan-name>/tasks.json is the source of truth for task progress
+- Git history and .mizu/<plan-name>/progress.txt show what was done before
 - Verification proves tasks are actually complete
 
 You always:
 - Read the plan to understand the big picture
-- Read execute_tasks.json to find the next pending task
-- Check git log and claude-progress.txt for context from previous sessions
+- Read tasks.json to find the next pending task
+- Check git log and progress.txt for context from previous sessions
 - Implement tasks following the plan's approach
 - Verify your work before marking tasks complete
 - Commit progress with descriptive messages
-- Update execute_tasks.json and claude-progress.txt before ending
+- Update tasks.json and progress.txt before ending
 
 You never:
 - Deviate significantly from the plan without good reason
@@ -86,7 +89,7 @@ You never:
 - Leave the codebase in a broken state
 
 When all tasks are complete:
-- All tasks in execute_tasks.json should be marked "completed"
+- All tasks in tasks.json should be marked "completed"
 - Tests should pass (if applicable)
 - Say "Plan execution complete" to indicate completion`;
 
@@ -96,6 +99,7 @@ When all tasks are complete:
 
 interface ExecutePromptContext extends PromptContext {
   project_dir: string;
+  plan_dir: string; // Plan-scoped directory (e.g., .mizu/my-plan/)
   model: string;
   session_number: number;
   plan_file: string;
@@ -126,8 +130,12 @@ function getWorkerPrompt(state: ExecuteState): string {
       .join("\n\n");
   }
 
+  // Get relative plan directory path (e.g., .mizu/my-plan)
+  const planDir = `.mizu/${state.planName}`;
+
   const context: ExecutePromptContext = {
     project_dir: state.projectDir,
+    plan_dir: planDir,
     model: state.model,
     session_number: state.sessionCount + 1,
     plan_file: state.planFile,
@@ -160,6 +168,10 @@ function getFallbackWorkerPrompt(context: ExecutePromptContext): string {
 
 Execute the next task from the plan in ${context.project_dir}.
 
+## Plan Directory
+
+All execution artifacts are in: ${context.plan_dir}/
+
 ## Progress
 - Tasks: ${context.completed_tasks}/${context.total_tasks} completed (${context.percentage}%)
 - Remaining: ${context.remaining_tasks}
@@ -174,7 +186,7 @@ ${context.plan_content}
 
 ${context.recent_summaries}
 
-Full history available in: ./claude-progress.txt
+Full history available in: ${context.plan_dir}/progress.txt
 
 ## Current Task
 
@@ -188,10 +200,10 @@ ${context.current_task_verification ? `**Verification:** \`${context.current_tas
 \`\`\`bash
 pwd
 git log --oneline -10
-cat claude-progress.txt | tail -50
+cat ${context.plan_dir}/progress.txt | tail -50
 \`\`\`
 
-2. **Read execute_tasks.json**
+2. **Read ${context.plan_dir}/tasks.json**
    Confirm the current task and check dependencies.
 
 3. **Execute the Task**
@@ -205,7 +217,7 @@ cat claude-progress.txt | tail -50
 ${context.current_task_verification || "# No automatic verification - manually verify and document"}
 \`\`\`
 
-5. **Update execute_tasks.json**
+5. **Update ${context.plan_dir}/tasks.json**
    Mark the task as completed:
 \`\`\`json
 {
@@ -221,7 +233,7 @@ git add -A
 git commit -m "execute: complete ${context.current_task_id || "task-XXX"} - <brief description>"
 \`\`\`
 
-7. **Update claude-progress.txt**
+7. **Update ${context.plan_dir}/progress.txt**
    Document what you accomplished in this session.
 
 ## Completion
@@ -263,8 +275,12 @@ function loadOrCreateState(options: ExecuteOptions): ExecuteState {
   const configDir = dirname(configFile);
   const projectDir = resolve(config.projectDir);
 
+  // Derive plan name from config file path
+  // Config is at .mizu/<plan-name>/execution.json
+  const planName = getPlanNameFromConfigPath(configFile);
+
   // Try to load existing state
-  const existing = loadExecuteState(projectDir);
+  const existing = loadExecuteState(projectDir, planName);
   if (existing) {
     // Sync tasks from file (agent may have modified it)
     return syncExecuteTasksFromFile(existing);
@@ -275,6 +291,7 @@ function loadOrCreateState(options: ExecuteOptions): ExecuteState {
 
   // Create new state from config
   return createExecuteState({
+    planName,
     projectDir,
     model: options.model ?? config.model ?? "claude-sonnet-4-5",
     configFile,
@@ -354,28 +371,32 @@ export async function runExecute(options: ExecuteOptions): Promise<void> {
   const projectDir = resolve(config.projectDir);
   const model = options.model ?? config.model ?? "claude-sonnet-4-5";
 
-  // Check for existing state
-  const hasState = existsSync(resolve(projectDir, ".ai-agent-state.json"));
+  // Derive plan name from config file path
+  const planName = getPlanNameFromConfigPath(configFile);
+  const planDir = getPlanDir(projectDir, planName);
 
-  if (hasState && !options.resume && !options.force) {
-    console.error("\nError: Execution state already exists for this project.");
+  // Check for existing state in plan-scoped directory
+  const stateExists = hasExistingState(projectDir, planName);
+
+  if (stateExists && !options.resume && !options.force) {
+    console.error("\nError: Execution state already exists for this plan.");
+    console.error(`Plan directory: ${planDir}`);
     console.error("Use --resume to continue from where you left off.");
     console.error("Use --force to start fresh (will overwrite existing progress).\n");
     process.exit(1);
   }
 
-  if (hasState && options.force) {
-    // Delete existing state files
-    const stateFile = resolve(projectDir, ".ai-agent-state.json");
-    const tasksFile = resolve(projectDir, "execute_tasks.json");
-    if (existsSync(stateFile)) {
-      const { unlinkSync } = await import("node:fs");
-      unlinkSync(stateFile);
-    }
-    if (existsSync(tasksFile)) {
-      const { unlinkSync } = await import("node:fs");
-      unlinkSync(tasksFile);
-    }
+  if (stateExists && options.force) {
+    // Delete existing state files in plan directory
+    const { unlinkSync } = await import("node:fs");
+    const stateFile = resolve(planDir, "state.json");
+    const tasksFile = resolve(planDir, "tasks.json");
+    const progressFile = resolve(planDir, "progress.txt");
+
+    if (existsSync(stateFile)) unlinkSync(stateFile);
+    if (existsSync(tasksFile)) unlinkSync(tasksFile);
+    if (existsSync(progressFile)) unlinkSync(progressFile);
+
     console.log("Existing state cleared. Starting fresh.\n");
   }
 
@@ -388,7 +409,7 @@ export async function runExecute(options: ExecuteOptions): Promise<void> {
   let state = loadOrCreateState({ ...options, configFile });
 
   // Save tasks file for agent to work with
-  saveExecuteTasks(state.projectDir, state.tasks);
+  saveExecuteTasks(state.projectDir, state.planName, state.tasks);
 
   // Print header
   printLongRunningHeader({
@@ -402,7 +423,8 @@ export async function runExecute(options: ExecuteOptions): Promise<void> {
   });
 
   // Print plan info
-  console.log(`Plan file: ${state.planFile}`);
+  console.log(`Plan: ${state.planName}`);
+  console.log(`Plan directory: .mizu/${state.planName}/`);
   console.log(`Config file: ${configFile}\n`);
 
   printExecuteProgress(state);
@@ -451,12 +473,13 @@ export async function runExecute(options: ExecuteOptions): Promise<void> {
       saveState(state);
 
       // Also save tasks file
-      saveExecuteTasks(state.projectDir, state.tasks);
+      saveExecuteTasks(state.projectDir, state.planName, state.tasks);
 
       // Append to progress
       const progress = getExecuteProgress(state.tasks);
       appendProgress(
         projectDir,
+        state.planName,
         `Session ${sessionNumber} completed. Tasks: ${progress.completed}/${progress.total} completed.\n${summary}`
       );
     },

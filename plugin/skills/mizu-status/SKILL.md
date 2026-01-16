@@ -7,29 +7,56 @@ description: Use when checking the status of an autonomous mizu plan execution -
 
 Check the status of a mizu plan execution by reading its state files.
 
+## Directory Structure
+
+Each plan has its own directory within `.mizu/`:
+
+```
+.mizu/
+└── <plan-name>/           # e.g., squishy-prancing-mango/
+    ├── plan.md            # Copy of the original plan
+    ├── execution.json     # Execution config
+    ├── state.json         # Execution state
+    ├── tasks.json         # Task list
+    └── progress.txt       # Progress log
+```
+
+## Finding Plans
+
+**To list all plan directories:**
+```bash
+ls -la .mizu/
+```
+
+**If user specifies a plan name:** Use `.mizu/<plan-name>/`
+
+**If multiple plans exist:** Use AskUserQuestion to let user choose which plan to check.
+
 ## Files to Read
 
-All files are in the `.mizu/` directory in the project where `mizu execute` was started:
+All files are in the plan directory `.mizu/<plan-name>/`:
 
 | File | Contains |
 |------|----------|
-| `.mizu/state.json` | Initialization state, session count, completion summary |
-| `.mizu/tasks.json` | Task list with status (pending/in_progress/completed/blocked) |
-| `.mizu/progress.txt` | Execution log with timestamps |
+| `state.json` | Initialization state, session count, plan name |
+| `tasks.json` | Task list with status (pending/in_progress/completed/blocked) |
+| `progress.txt` | Execution log with timestamps |
 
 ## Quick Status Check
 
-Read `.mizu/state.json` and `.mizu/tasks.json` together:
+Read `state.json` and `tasks.json` together:
 
 ```json
-// .mizu/state.json
+// .mizu/<plan-name>/state.json
 {
+  "planName": "squishy-prancing-mango",
   "initialized": true,
   "sessionCount": 5,
-  "completionSummary": "Completed 3 of 5 tasks..."
+  "completedTasks": 3,
+  "totalTasks": 5
 }
 
-// .mizu/tasks.json
+// .mizu/<plan-name>/tasks.json
 [
   {"id": "task-001", "description": "...", "status": "completed", "completedAt": "..."},
   {"id": "task-002", "description": "...", "status": "in_progress"},
@@ -46,13 +73,14 @@ Read `.mizu/state.json` and `.mizu/tasks.json` together:
 Use Bash to get recent execution notes:
 
 ```bash
-tail -50 .mizu/progress.txt
+tail -50 .mizu/<plan-name>/progress.txt
 ```
 
 ## Reporting Status
 
 When asked for status, report:
-1. **Progress:** X% (Y of Z tasks completed)
-2. **Current task:** What's being worked on
-3. **Session count:** How many agent sessions have run
-4. **Recent activity:** Last few lines from progress file (if relevant)
+1. **Plan:** Name of the plan being executed
+2. **Progress:** X% (Y of Z tasks completed)
+3. **Current task:** What's being worked on
+4. **Session count:** How many agent sessions have run
+5. **Recent activity:** Last few lines from progress file (if relevant)

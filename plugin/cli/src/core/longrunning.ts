@@ -16,8 +16,8 @@ import { resolve } from "node:path";
 import type {
   ProjectState,
   ExecuteState,
+  AgentType,
 } from "./state";
-import type { AgentType } from "./permissions";
 import { createSecurePermissionCallback } from "./security";
 import {
   createSettingsFile,
