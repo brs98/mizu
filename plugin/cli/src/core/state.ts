@@ -52,6 +52,10 @@ export interface AgentTask {
   dependencies: string[]; // Task IDs this depends on
   completedAt?: string;
   notes?: string;
+  // Harness-driven verification tracking
+  attemptCount?: number; // Number of attempts made
+  verificationOutput?: string; // Last verification command output
+  verificationPassedAt?: string; // When verification passed
 }
 
 // =============================================================================
@@ -76,6 +80,10 @@ export interface ExecutionConfig {
     completionSummary: string;
     sessionCount: number;
   };
+  // Optional health check command to run before each session
+  healthCheckCommand?: string;
+  // Enable TDD mode with test subagent
+  tdd?: boolean;
 }
 
 export interface ExecuteState extends BaseState {

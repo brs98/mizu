@@ -14,6 +14,7 @@
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 
 import {
   type ExecuteState,
@@ -23,7 +24,6 @@ import {
   saveState,
   syncExecuteTasksFromFile,
   getExecuteProgress,
-  isComplete,
   printExecuteProgress,
   appendProgress,
   incrementSession,
@@ -41,6 +41,15 @@ import {
   printLongRunningHeader,
   printLongRunningCompletion,
 } from "../../core/longrunning";
+import {
+  runTestSubagent,
+  loadTestInfo,
+  type TestInfo,
+} from "../test";
+import {
+  runVerification,
+  MAX_RETRY_ATTEMPTS,
+} from "../verify";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPTS_DIR = resolve(__dirname, "prompts");
@@ -55,6 +64,135 @@ export interface ExecuteOptions {
   maxSessions?: number;
   resume?: boolean;
   force?: boolean;
+  tdd?: boolean; // Enable TDD mode with test subagent
+}
+
+// =============================================================================
+// Health Check
+// =============================================================================
+
+export interface HealthCheckResult {
+  passed: boolean;
+  output: string;
+  command?: string;
+  exitCode?: number;
+}
+
+/**
+ * Run a health check command before starting a session.
+ * This catches regressions early and provides context for the agent.
+ */
+async function runHealthCheck(
+  command: string | undefined,
+  projectDir: string
+): Promise<HealthCheckResult> {
+  if (!command) {
+    return { passed: true, output: "No health check command configured" };
+  }
+
+  return new Promise((resolve) => {
+    const child = spawn("sh", ["-c", command], {
+      cwd: projectDir,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout?.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    child.stderr?.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    child.on("close", (exitCode) => {
+      const output = stdout + (stderr ? `\nSTDERR:\n${stderr}` : "");
+      resolve({
+        passed: exitCode === 0,
+        output: output.slice(-2000), // Limit output size
+        command,
+        exitCode: exitCode ?? 1,
+      });
+    });
+
+    child.on("error", (err) => {
+      resolve({
+        passed: false,
+        output: `Failed to run health check: ${err.message}`,
+        command,
+        exitCode: 1,
+      });
+    });
+
+    // Timeout after 60 seconds
+    setTimeout(() => {
+      child.kill();
+      resolve({
+        passed: false,
+        output: "Health check timed out after 60 seconds",
+        command,
+        exitCode: 124,
+      });
+    }, 60000);
+  });
+}
+
+/**
+ * Run a verification command to detect task completion.
+ * Returns true if the command exits with code 0.
+ */
+export async function runVerificationCommand(
+  command: string,
+  projectDir: string
+): Promise<{ passed: boolean; output: string; exitCode: number }> {
+  return new Promise((resolve) => {
+    const child = spawn("sh", ["-c", command], {
+      cwd: projectDir,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout?.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    child.stderr?.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    child.on("close", (exitCode) => {
+      const output = stdout + (stderr ? `\nSTDERR:\n${stderr}` : "");
+      resolve({
+        passed: exitCode === 0,
+        output: output.slice(-4000), // Limit output size
+        exitCode: exitCode ?? 1,
+      });
+    });
+
+    child.on("error", (err) => {
+      resolve({
+        passed: false,
+        output: `Failed to run verification: ${err.message}`,
+        exitCode: 1,
+      });
+    });
+
+    // Timeout after 120 seconds
+    setTimeout(() => {
+      child.kill();
+      resolve({
+        passed: false,
+        output: "Verification command timed out after 120 seconds",
+        exitCode: 124,
+      });
+    }, 120000);
+  });
 }
 
 // =============================================================================
@@ -69,29 +207,29 @@ You understand that:
 - The plan provides the overall vision and approach
 - Each task should be completed fully before moving on
 - Each session is independent - you have no memory of previous sessions
-- .mizu/<plan-name>/tasks.json is the source of truth for task progress
-- Git history and .mizu/<plan-name>/progress.txt show what was done before
-- Verification proves tasks are actually complete
+- Git history and progress.txt show what was done before
+- The harness automatically tracks task completion via verification commands
+- Your job is to implement and verify, not to track progress
 
 You always:
 - Read the plan to understand the big picture
-- Read tasks.json to find the next pending task
 - Check git log and progress.txt for context from previous sessions
 - Implement tasks following the plan's approach
-- Verify your work before marking tasks complete
+- Run verification commands to confirm your work
 - Commit progress with descriptive messages
-- Update tasks.json and progress.txt before ending
+- Document your work in progress.txt
 
 You never:
 - Deviate significantly from the plan without good reason
 - Try to complete multiple tasks at once without verification
-- Mark tasks as completed without running verification
+- Skip running verification commands
 - Leave the codebase in a broken state
 
-When all tasks are complete:
-- All tasks in tasks.json should be marked "completed"
-- Tests should pass (if applicable)
-- Say "Plan execution complete" to indicate completion`;
+When you complete a task:
+- Run the verification command (if provided)
+- Commit your changes
+- Document in progress.txt
+- The harness will detect completion and assign the next task`;
 
 // =============================================================================
 // Prompt Context
@@ -112,13 +250,25 @@ interface ExecutePromptContext extends PromptContext {
   current_task?: string;
   current_task_id?: string;
   current_task_verification?: string;
+  // Health check results
+  health_check_passed?: boolean;
+  health_check_output?: string;
+  // TDD test info (from test subagent) - serialized as strings
+  test_info_exists?: boolean;
+  test_info_test_command?: string;
+  test_info_failure_output?: string;
+  test_info_status?: string;
 }
 
 // =============================================================================
 // Prompt Generation
 // =============================================================================
 
-function getWorkerPrompt(state: ExecuteState): string {
+function getWorkerPrompt(
+  state: ExecuteState,
+  healthCheckResult?: HealthCheckResult,
+  testInfo?: TestInfo
+): string {
   const progress = getExecuteProgress(state.tasks);
   const nextTask = getNextPendingTask(state.tasks);
 
@@ -148,6 +298,16 @@ function getWorkerPrompt(state: ExecuteState): string {
     current_task: nextTask?.description,
     current_task_id: nextTask?.id,
     current_task_verification: nextTask?.verificationCommand,
+    // Health check results
+    health_check_passed: healthCheckResult?.passed,
+    health_check_output: healthCheckResult && !healthCheckResult.passed
+      ? healthCheckResult.output
+      : undefined,
+    // TDD test info - serialized
+    test_info_exists: testInfo !== undefined,
+    test_info_test_command: testInfo?.testCommand,
+    test_info_failure_output: testInfo?.failureOutput,
+    test_info_status: testInfo?.status,
   };
 
   const promptFile = resolve(PROMPTS_DIR, "worker.md");
@@ -164,18 +324,26 @@ function getWorkerPrompt(state: ExecuteState): string {
 // =============================================================================
 
 function getFallbackWorkerPrompt(context: ExecutePromptContext): string {
+  const healthCheckSection = context.health_check_output
+    ? `\n## ⚠️ Health Check Failed
+
+The health check detected issues:
+
+\`\`\`
+${context.health_check_output}
+\`\`\`
+
+**Action Required:** Fix these issues before proceeding with new work.\n`
+    : "";
+
   return `# Plan Execution - Session ${context.session_number}
 
 Execute the next task from the plan in ${context.project_dir}.
 
-## Plan Directory
-
-All execution artifacts are in: ${context.plan_dir}/
-
 ## Progress
 - Tasks: ${context.completed_tasks}/${context.total_tasks} completed (${context.percentage}%)
 - Remaining: ${context.remaining_tasks}
-
+${healthCheckSection}
 ## The Plan
 
 \`\`\`markdown
@@ -194,17 +362,17 @@ ${context.current_task ? `**Task ID:** ${context.current_task_id}
 **Description:** ${context.current_task}
 ${context.current_task_verification ? `**Verification:** \`${context.current_task_verification}\`` : "**Verification:** Self-verify and document in completion notes"}` : "No pending tasks - all tasks may be complete!"}
 
-## Your Tasks
+## Workflow
 
-1. **Get Your Bearings**
+1. **Orient Yourself**
 \`\`\`bash
 pwd
 git log --oneline -10
 cat ${context.plan_dir}/progress.txt | tail -50
 \`\`\`
 
-2. **Read ${context.plan_dir}/tasks.json**
-   Confirm the current task and check dependencies.
+2. **Review Current State**
+   Check git history and progress notes. Your current task is shown above.
 
 3. **Execute the Task**
    - Follow the plan's approach
@@ -217,31 +385,23 @@ cat ${context.plan_dir}/progress.txt | tail -50
 ${context.current_task_verification || "# No automatic verification - manually verify and document"}
 \`\`\`
 
-5. **Update ${context.plan_dir}/tasks.json**
-   Mark the task as completed:
-\`\`\`json
-{
-  "id": "${context.current_task_id || "task-XXX"}",
-  "status": "completed",
-  "completedAt": "${new Date().toISOString()}"
-}
-\`\`\`
-
-6. **Commit Progress**
+5. **Commit Progress**
 \`\`\`bash
 git add -A
-git commit -m "execute: complete ${context.current_task_id || "task-XXX"} - <brief description>"
+git commit -m "execute: ${context.current_task_id || "task-XXX"} - <brief description>"
 \`\`\`
 
-7. **Update ${context.plan_dir}/progress.txt**
-   Document what you accomplished in this session.
+6. **Document in Progress File**
+   Append to ${context.plan_dir}/progress.txt what you accomplished.
 
-## Completion
+## Important
 
-When ALL tasks are completed and verified:
-- Say "Plan execution complete" to indicate completion
+- **One task per session** - Focus on the current task fully
+- **Verify before committing** - Run the verification command
+- **Leave code working** - Every session should end with a functional codebase
+- **Harness tracks progress** - You don't need to update task files; the harness detects completion
 
-Work on ONE task at a time. Leave the codebase in a working state.`;
+Work on ONE task at a time. The harness will automatically detect completion and assign the next task.`;
 }
 
 // =============================================================================
@@ -300,31 +460,6 @@ function loadOrCreateState(options: ExecuteOptions): ExecuteState {
     tasks: config.tasks,
     permissions: config.permissions,
   });
-}
-
-// =============================================================================
-// Completion Detection
-// =============================================================================
-
-function checkExecuteCompletion(response: string, state: ExecuteState): boolean {
-  // Re-sync tasks from file after each session
-  const updated = syncExecuteTasksFromFile(state);
-
-  // Check if all tasks are complete
-  if (isComplete(updated)) {
-    return true;
-  }
-
-  // Also check for explicit completion phrases (fallback)
-  const lower = response.toLowerCase();
-  const completionPhrases = [
-    "plan execution complete",
-    "all tasks completed",
-    "execution complete",
-    "plan complete",
-  ];
-
-  return completionPhrases.some((phrase) => lower.includes(phrase));
 }
 
 // =============================================================================
@@ -429,8 +564,21 @@ export async function runExecute(options: ExecuteOptions): Promise<void> {
 
   printExecuteProgress(state);
 
-  // Track current task for summary extraction
+  // Track current task, health check results, and test info for the current session
   let currentTaskId: string | undefined;
+  let currentTask: ReturnType<typeof getNextPendingTask>;
+  let lastHealthCheckResult: HealthCheckResult | undefined;
+  let currentTestInfo: TestInfo | undefined;
+
+  // Determine health check command (use first task's verification or a common pattern)
+  const healthCheckCommand = config.healthCheckCommand ??
+    state.tasks.find(t => t.verificationCommand)?.verificationCommand;
+
+  // TDD mode flag
+  const tddEnabled = options.tdd ?? config.tdd ?? false;
+  if (tddEnabled) {
+    console.log("TDD mode enabled: Test subagent will run before each task.\n");
+  }
 
   // Run the long-running agent loop
   const result = await runLongRunningAgent({
@@ -445,9 +593,9 @@ export async function runExecute(options: ExecuteOptions): Promise<void> {
 
     getPrompt: (sessionNumber, currentState) => {
       const executeState = currentState as ExecuteState;
-      const nextTask = getNextPendingTask(executeState.tasks);
-      currentTaskId = nextTask?.id;
-      return getWorkerPrompt(executeState);
+      currentTask = getNextPendingTask(executeState.tasks);
+      currentTaskId = currentTask?.id;
+      return getWorkerPrompt(executeState, lastHealthCheckResult, currentTestInfo);
     },
 
     loadState: () => loadOrCreateState({ ...options, configFile }),
@@ -457,22 +605,131 @@ export async function runExecute(options: ExecuteOptions): Promise<void> {
       saveState(state);
     },
 
-    onSessionStart: (sessionNumber) => {
+    onSessionStart: async (sessionNumber) => {
       console.log(`\n--- Plan Execution Session ${sessionNumber} ---\n`);
+
+      // Get the current task for this session
+      const nextTask = getNextPendingTask(state.tasks);
+
+      // Run health check before session
+      if (healthCheckCommand) {
+        console.log(`Running health check: ${healthCheckCommand}`);
+        lastHealthCheckResult = await runHealthCheck(healthCheckCommand, projectDir);
+        if (lastHealthCheckResult.passed) {
+          console.log("✓ Health check passed\n");
+        } else {
+          console.log(`⚠ Health check failed (exit code ${lastHealthCheckResult.exitCode})`);
+          console.log("Agent will be informed of failures.\n");
+        }
+      }
+
+      // Run test subagent in TDD mode (before main agent)
+      if (tddEnabled && nextTask) {
+        // Check if tests already exist for this task
+        currentTestInfo = loadTestInfo(projectDir, state.planName, nextTask.id) ?? undefined;
+
+        if (!currentTestInfo || currentTestInfo.status !== "red") {
+          console.log(`\n=== TDD: Running Test Subagent for ${nextTask.id} ===\n`);
+          const testResult = await runTestSubagent(nextTask, state, model);
+
+          if (testResult.status === "red") {
+            console.log("\n✓ Test subagent completed: Tests are RED (failing)\n");
+            currentTestInfo = loadTestInfo(projectDir, state.planName, nextTask.id) ?? undefined;
+          } else if (testResult.status === "green") {
+            console.log("\n⚠ Tests passed unexpectedly. Feature may already exist.\n");
+          } else {
+            console.log(`\n⚠ Test subagent error: ${testResult.error}\n`);
+          }
+        } else {
+          console.log(`\n✓ Tests already exist and are RED for ${nextTask.id}\n`);
+        }
+      }
     },
 
-    onSessionEnd: (sessionNumber, response) => {
-      // Sync state from files
-      state = syncExecuteTasksFromFile(state);
-      state = incrementSession(state) as ExecuteState;
-
-      // Extract and store summary for bounded context
+    onSessionEnd: async (sessionNumber, response) => {
+      // Extract summary for bounded context
       const summary = extractSessionSummary(response, currentTaskId);
+
+      // Get current attempt count for this task
+      const taskIndex = state.tasks.findIndex(t => t.id === currentTaskId);
+      const currentAttemptCount = taskIndex >= 0
+        ? (state.tasks[taskIndex].attemptCount ?? 0) + 1
+        : 1;
+
+      // Run verification (use full verification subagent in TDD mode)
+      if (tddEnabled && currentTask) {
+        // Full TDD verification with retry support
+        const verifyResult = await runVerification(currentTask, state, currentAttemptCount);
+
+        if (verifyResult.passed) {
+          console.log("✓ Verification PASSED - marking task complete\n");
+          if (taskIndex >= 0) {
+            state.tasks[taskIndex].status = "completed";
+            state.tasks[taskIndex].completedAt = new Date().toISOString();
+            state.tasks[taskIndex].attemptCount = currentAttemptCount;
+          }
+        } else {
+          // Check if we've hit max retries
+          if (currentAttemptCount >= MAX_RETRY_ATTEMPTS) {
+            console.log(`\n⚠ Max retries (${MAX_RETRY_ATTEMPTS}) exceeded - marking task BLOCKED\n`);
+            if (taskIndex >= 0) {
+              state.tasks[taskIndex].status = "blocked";
+              state.tasks[taskIndex].attemptCount = currentAttemptCount;
+              state.tasks[taskIndex].notes = `Blocked after ${MAX_RETRY_ATTEMPTS} failed attempts. ${verifyResult.retryGuidance || ""}`;
+            }
+          } else {
+            console.log(`\n✗ Verification FAILED (attempt ${currentAttemptCount}/${MAX_RETRY_ATTEMPTS})`);
+            console.log("Task will be retried in next session.\n");
+            if (taskIndex >= 0) {
+              state.tasks[taskIndex].attemptCount = currentAttemptCount;
+              state.tasks[taskIndex].notes = verifyResult.retryGuidance;
+            }
+          }
+        }
+      } else if (currentTask?.verificationCommand) {
+        // Simple verification (non-TDD mode)
+        console.log(`\nRunning verification: ${currentTask.verificationCommand}`);
+        const verifyResult = await runVerificationCommand(
+          currentTask.verificationCommand,
+          projectDir
+        );
+
+        if (verifyResult.passed) {
+          console.log("✓ Verification passed - marking task complete\n");
+          if (taskIndex >= 0) {
+            state.tasks[taskIndex].status = "completed";
+            state.tasks[taskIndex].completedAt = new Date().toISOString();
+            state.tasks[taskIndex].verificationOutput = verifyResult.output;
+          }
+        } else {
+          console.log(`✗ Verification failed (exit code ${verifyResult.exitCode})`);
+
+          // Check for max retries in non-TDD mode too
+          if (currentAttemptCount >= MAX_RETRY_ATTEMPTS) {
+            console.log(`\n⚠ Max retries (${MAX_RETRY_ATTEMPTS}) exceeded - marking task BLOCKED\n`);
+            if (taskIndex >= 0) {
+              state.tasks[taskIndex].status = "blocked";
+              state.tasks[taskIndex].attemptCount = currentAttemptCount;
+              state.tasks[taskIndex].verificationOutput = verifyResult.output;
+            }
+          } else {
+            console.log(`Task remains in progress for next session (attempt ${currentAttemptCount}/${MAX_RETRY_ATTEMPTS}).\n`);
+            if (taskIndex >= 0) {
+              state.tasks[taskIndex].attemptCount = currentAttemptCount;
+              state.tasks[taskIndex].verificationOutput = verifyResult.output;
+            }
+          }
+        }
+      } else {
+        // No verification command - trust the agent (legacy behavior)
+        console.log("\nNo verification command for this task.\n");
+      }
+
+      // Increment session and add summary
+      state = incrementSession(state) as ExecuteState;
       state = addRecentSummary(state, summary);
 
       saveState(state);
-
-      // Also save tasks file
       saveExecuteTasks(state.projectDir, state.planName, state.tasks);
 
       // Append to progress
@@ -484,7 +741,12 @@ export async function runExecute(options: ExecuteOptions): Promise<void> {
       );
     },
 
-    isComplete: (response) => checkExecuteCompletion(response, state),
+    isComplete: (_response) => {
+      // Harness-driven completion: check if all tasks are complete
+      // (verification commands determine completion, not agent's claims)
+      const progress = getExecuteProgress(state.tasks);
+      return progress.completed === progress.total && progress.total > 0;
+    },
   });
 
   // Print completion summary

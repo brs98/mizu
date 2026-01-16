@@ -8,6 +8,20 @@ Execute the next task from the plan in {{ project_dir }}.
 
 Remaining tasks: {{ remaining_tasks }}
 
+{% if health_check_output %}
+---
+
+## ⚠️ Health Check Failed
+
+The health check ran before this session and detected issues:
+
+```
+{{ health_check_output }}
+```
+
+**Action Required:** Review and fix these issues before proceeding with new work. The health check ensures the codebase is in a working state.
+{% endif %}
+
 ---
 
 ## The Plan
@@ -40,6 +54,25 @@ Full history available in: `./claude-progress.txt`
 {% else %}
 **Verification:** Self-verify and document what you checked in your completion notes
 {% endif %}
+
+{% if test_info_exists %}
+---
+
+## Pre-Written Tests (TDD - GREEN Phase)
+
+The Test Subagent has written failing tests for this task. Your job is to make them pass.
+
+**Test Command:** `{{ test_info_test_command }}`
+
+**Current Status:** RED (failing)
+
+**Failure Output:**
+```
+{{ test_info_failure_output }}
+```
+
+**Your Goal:** Implement the feature so that the tests pass (GREEN).
+{% endif %}
 {% else %}
 No pending tasks found. Check if all tasks are complete or if there are blocked tasks.
 {% endif %}
@@ -58,7 +91,7 @@ cat claude-progress.txt | tail -50
 
 ### 2. Review Current State
 
-Read `execute_tasks.json` to confirm the current task and verify dependencies are met.
+Review git history and progress notes to understand the current state. Your current task is shown above.
 
 ### 3. Execute the Task
 
@@ -83,27 +116,14 @@ No automatic verification command. Manually verify:
 Document what you verified in your completion notes.
 {% endif %}
 
-### 5. Update Task Status
-
-Update `execute_tasks.json` to mark the task completed:
-
-```json
-{
-  "id": "{{ current_task_id }}",
-  "status": "completed",
-  "completedAt": "TIMESTAMP",
-  "notes": "Brief description of what was done and verified"
-}
-```
-
-### 6. Commit Progress
+### 5. Commit Progress
 
 ```bash
 git add -A
 git commit -m "execute: {{ current_task_id }} - <brief description>"
 ```
 
-### 7. Document in Progress File
+### 6. Document in Progress File
 
 Append to `claude-progress.txt`:
 - What you implemented
@@ -115,11 +135,13 @@ Append to `claude-progress.txt`:
 
 ## Completion
 
-When ALL tasks in `execute_tasks.json` are marked "completed":
+When you have completed the current task:
 
-1. Run any final verification commands
-2. Ensure the codebase is in a clean, working state
-3. Say **"Plan execution complete"** to end the session
+1. Ensure verification passes (run the verification command if provided)
+2. Commit your changes
+3. Document your progress
+
+The harness will automatically detect task completion and assign the next task.
 
 ---
 
@@ -127,6 +149,7 @@ When ALL tasks in `execute_tasks.json` are marked "completed":
 
 - **One task per session** - Focus on completing the current task fully
 - **Follow the plan** - The plan was designed intentionally; follow its approach
-- **Verify before completing** - Never mark a task done without verification
+- **Verify before committing** - Always run verification to confirm your work
 - **Leave code working** - Every session should end with a functional codebase
 - **Document clearly** - Future sessions depend on your progress notes
+- **Harness tracks progress** - You don't need to update task files; the harness detects completion

@@ -50,6 +50,7 @@ program
   .option("--force", "Force restart, overwriting existing state")
   .option("-m, --model <name>", "Claude model to use (overrides config)")
   .option("--max-sessions <number>", "Maximum number of sessions")
+  .option("--tdd", "Enable TDD mode: Test subagent writes failing tests before implementation")
   .action(async (configPath, options) => {
     if (!existsSync(configPath)) {
       console.error(`Error: Config file not found: ${configPath}`);
@@ -63,6 +64,7 @@ program
         maxSessions: options.maxSessions ? parseInt(options.maxSessions, 10) : undefined,
         resume: options.resume,
         force: options.force,
+        tdd: options.tdd,
       });
     } catch (err) {
       console.error("Fatal error:", err);

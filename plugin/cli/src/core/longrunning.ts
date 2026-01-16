@@ -47,8 +47,8 @@ export interface LongRunningConfig {
   getPrompt: (sessionNumber: number, state: ProjectState) => string;
   loadState: () => ProjectState;
   saveState: (state: ProjectState) => void;
-  onSessionStart?: (sessionNumber: number) => void;
-  onSessionEnd?: (sessionNumber: number, response: string) => void;
+  onSessionStart?: (sessionNumber: number) => void | Promise<void>;
+  onSessionEnd?: (sessionNumber: number, response: string) => void | Promise<void>;
   isComplete?: (response: string) => boolean;
 }
 
@@ -261,8 +261,8 @@ export async function runLongRunningAgent(
   while (sessionNumber < maxSessions) {
     sessionNumber++;
 
-    // Notify session start
-    onSessionStart?.(sessionNumber);
+    // Notify session start (may be async for health checks)
+    await onSessionStart?.(sessionNumber);
 
     console.log(
       `\n${"=".repeat(70)}\n  SESSION ${sessionNumber}${maxSessions === Infinity ? "" : ` / ${maxSessions}`}\n${"=".repeat(70)}\n`,
@@ -288,8 +288,8 @@ export async function runLongRunningAgent(
       continue;
     }
 
-    // Notify session end
-    onSessionEnd?.(sessionNumber, result.response);
+    // Notify session end (may be async for verification)
+    await onSessionEnd?.(sessionNumber, result.response);
 
     // Reload state (agent may have modified files)
     state = loadState();
