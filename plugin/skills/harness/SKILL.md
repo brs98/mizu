@@ -115,9 +115,14 @@ Example: If base directory is `/Users/x/.claude/plugins/cache/mizu/mizu/1.0.0/sk
 - Plugin root: `/Users/x/.claude/plugins/cache/mizu/mizu/1.0.0`
 - Binary path: `<plugin-root>/bin/mizu`
 
-**Check if binary exists.** If `<plugin-root>/bin/mizu` does not exist, include build instructions.
+**MANDATORY: Check if binary exists using Bash:**
+```bash
+test -f <plugin-root>/bin/mizu && echo "exists" || echo "missing"
+```
 
-**Output format (binary exists):**
+You MUST run this check. Do not assume the binary exists.
+
+**If binary exists**, output:
 ```
 Execution config generated: ./.mizu/<name>.execution.json
 
@@ -129,7 +134,7 @@ Resume if interrupted:  <plugin-root>/bin/mizu execute --resume ./.mizu/<name>.e
 Start fresh:            <plugin-root>/bin/mizu execute --force ./.mizu/<name>.execution.json
 ```
 
-**Output format (binary missing):**
+**If binary is missing**, output:
 ```
 Execution config generated: ./.mizu/<name>.execution.json
 
