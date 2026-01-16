@@ -29,6 +29,3 @@ bun.lock
 
 # Mizu execution state (generated during plan execution)
 .mizu/
-
-# Compiled CLI binary (build with: bun run build)
-plugin/bin/

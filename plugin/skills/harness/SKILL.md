@@ -113,41 +113,41 @@ Save config at: `.mizu/<plan-name>.execution.json` (sibling to state files)
 
 Example: If base directory is `/Users/x/.claude/plugins/cache/mizu/mizu/1.0.0/skills/harness`, then:
 - Plugin root: `/Users/x/.claude/plugins/cache/mizu/mizu/1.0.0`
-- Binary path: `<plugin-root>/bin/mizu`
+- CLI path: `<plugin-root>/cli/src/mizu.ts`
 
-**MANDATORY: Check if binary exists using Bash:**
+**MANDATORY: Check if dependencies are installed using Bash:**
 ```bash
-test -f <plugin-root>/bin/mizu && echo "exists" || echo "missing"
+test -d <plugin-root>/cli/node_modules && echo "installed" || echo "missing"
 ```
 
-You MUST run this check. Do not assume the binary exists.
+You MUST run this check. Do not assume dependencies are installed.
 
-**If binary exists**, output:
+**If dependencies installed**, output:
 ```
 Execution config generated: ./.mizu/<name>.execution.json
 
 To execute autonomously, exit Claude Code and run:
 
-  <plugin-root>/bin/mizu execute ./.mizu/<name>.execution.json
+  bun run <plugin-root>/cli/src/mizu.ts execute ./.mizu/<name>.execution.json
 
-Resume if interrupted:  <plugin-root>/bin/mizu execute --resume ./.mizu/<name>.execution.json
-Start fresh:            <plugin-root>/bin/mizu execute --force ./.mizu/<name>.execution.json
+Resume if interrupted:  bun run <plugin-root>/cli/src/mizu.ts execute --resume ./.mizu/<name>.execution.json
+Start fresh:            bun run <plugin-root>/cli/src/mizu.ts execute --force ./.mizu/<name>.execution.json
 ```
 
-**If binary is missing**, output:
+**If dependencies missing**, output:
 ```
 Execution config generated: ./.mizu/<name>.execution.json
 
-First, build the mizu CLI (one-time setup):
+First, install dependencies (one-time setup):
 
-  cd <plugin-root>/cli && bun install && bun run build
+  cd <plugin-root>/cli && bun install
 
 Then execute autonomously:
 
-  <plugin-root>/bin/mizu execute ./.mizu/<name>.execution.json
+  bun run <plugin-root>/cli/src/mizu.ts execute ./.mizu/<name>.execution.json
 
-Resume if interrupted:  <plugin-root>/bin/mizu execute --resume ./.mizu/<name>.execution.json
-Start fresh:            <plugin-root>/bin/mizu execute --force ./.mizu/<name>.execution.json
+Resume if interrupted:  bun run <plugin-root>/cli/src/mizu.ts execute --resume ./.mizu/<name>.execution.json
+Start fresh:            bun run <plugin-root>/cli/src/mizu.ts execute --force ./.mizu/<name>.execution.json
 ```
 
 Replace `<plugin-root>` with the actual absolute path derived from your base directory.

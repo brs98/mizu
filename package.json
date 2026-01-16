@@ -8,7 +8,6 @@
     "mizu": "plugin/cli/src/mizu.ts"
   },
   "scripts": {
-    "build": "bun build --compile plugin/cli/src/mizu.ts --outfile plugin/bin/mizu",
     "dev": "bun run plugin/cli/src/mizu.ts",
     "execute": "bun run plugin/cli/src/mizu.ts execute",
     "status": "bun run plugin/cli/src/mizu.ts status",
