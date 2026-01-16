@@ -113,18 +113,36 @@ Save config at: `.mizu/<plan-name>.execution.json` (sibling to state files)
 
 Example: If base directory is `/Users/x/.claude/plugins/cache/mizu/mizu/1.0.0/skills/harness`, then:
 - Plugin root: `/Users/x/.claude/plugins/cache/mizu/mizu/1.0.0`
-- CLI path: `<plugin-root>/cli/src/mizu.ts`
+- Binary path: `<plugin-root>/bin/mizu`
 
-**Output format:**
+**Check if binary exists.** If `<plugin-root>/bin/mizu` does not exist, include build instructions.
+
+**Output format (binary exists):**
 ```
 Execution config generated: ./.mizu/<name>.execution.json
 
 To execute autonomously, exit Claude Code and run:
 
-  bun run <plugin-root>/cli/src/mizu.ts execute ./.mizu/<name>.execution.json
+  <plugin-root>/bin/mizu execute ./.mizu/<name>.execution.json
 
-Resume if interrupted:  bun run <plugin-root>/cli/src/mizu.ts execute --resume ./.mizu/<name>.execution.json
-Start fresh:            bun run <plugin-root>/cli/src/mizu.ts execute --force ./.mizu/<name>.execution.json
+Resume if interrupted:  <plugin-root>/bin/mizu execute --resume ./.mizu/<name>.execution.json
+Start fresh:            <plugin-root>/bin/mizu execute --force ./.mizu/<name>.execution.json
+```
+
+**Output format (binary missing):**
+```
+Execution config generated: ./.mizu/<name>.execution.json
+
+First, build the mizu CLI (one-time setup):
+
+  cd <plugin-root> && bun install && bun run build
+
+Then execute autonomously:
+
+  <plugin-root>/bin/mizu execute ./.mizu/<name>.execution.json
+
+Resume if interrupted:  <plugin-root>/bin/mizu execute --resume ./.mizu/<name>.execution.json
+Start fresh:            <plugin-root>/bin/mizu execute --force ./.mizu/<name>.execution.json
 ```
 
 Replace `<plugin-root>` with the actual absolute path derived from your base directory.
