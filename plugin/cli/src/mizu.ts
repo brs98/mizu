@@ -50,7 +50,7 @@ program
   .option("--force", "Force restart, overwriting existing state")
   .option("-m, --model <name>", "Claude model to use (overrides config)")
   .option("--max-sessions <number>", "Maximum number of sessions")
-  .option("--tdd", "Enable TDD mode: Test subagent writes failing tests before implementation")
+  .option("--no-tdd", "Disable TDD mode (TDD is enabled by default)")
   .action(async (configPath, options) => {
     if (!existsSync(configPath)) {
       console.error(`Error: Config file not found: ${configPath}`);
@@ -201,10 +201,13 @@ program.addHelpText(
 Examples:
   # Workflow: Create plan in Claude Code → /harness skill → mizu execute
 
-  # Execute a plan (config is at .mizu/<plan-name>/execution.json)
+  # Execute a plan with TDD (default - test subagent writes tests first)
   $ mizu execute ./.mizu/my-feature/execution.json
   $ mizu execute --resume ./.mizu/my-feature/execution.json
   $ mizu execute --force ./.mizu/my-feature/execution.json
+
+  # Execute without TDD (skip test subagent)
+  $ mizu execute --no-tdd ./.mizu/my-feature/execution.json
 
   # Check progress
   $ mizu status -p ./my-app                          # Auto-detect if only one plan
@@ -221,6 +224,7 @@ Plan Structure:
     └── progress.txt      # Execution log
 
 Features:
+  - TDD by default: Test subagent writes failing tests, verify subagent checks GREEN
   - Task-based execution with dependency management
   - Persistent state for crash recovery
   - Session-based progress tracking
