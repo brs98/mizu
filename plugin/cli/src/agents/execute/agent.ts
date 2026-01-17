@@ -47,6 +47,10 @@ import {
   type TestInfo,
 } from "../test";
 import {
+  runValidationWithFix,
+  type ValidationResult,
+} from "../validate";
+import {
   runVerification,
   MAX_RETRY_ATTEMPTS,
 } from "../verify";
@@ -642,6 +646,30 @@ export async function runExecute(options: ExecuteOptions): Promise<void> {
           }
         } else {
           console.log(`\n✓ Tests already exist and are RED for ${nextTask.id}\n`);
+        }
+
+        // Run test validation to check tests are valid (no bugs in tests themselves)
+        // Uses self-fix to automatically repair common test bugs
+        if (currentTestInfo?.status === "red") {
+          console.log(`\n=== TDD: Validating Tests for ${nextTask.id} ===\n`);
+          const validationResult = await runValidationWithFix(nextTask, state, currentTestInfo, model);
+
+          if (validationResult.valid) {
+            if (validationResult.fixApplied) {
+              console.log("✓ Tests validated (after automatic fix) - ready for implementation\n");
+            } else {
+              console.log("✓ Tests validated - ready for implementation\n");
+            }
+          } else {
+            console.log("⚠ Test validation issues detected:\n");
+            for (const issue of validationResult.issues.slice(0, 3)) {
+              console.log(`  - [${issue.type}] ${issue.message}`);
+              if (issue.suggestion) {
+                console.log(`    Suggestion: ${issue.suggestion}`);
+              }
+            }
+            console.log("\nMain agent will be informed of these issues.\n");
+          }
         }
       }
     },
